@@ -62,7 +62,7 @@ func process_mail(path string) (update update) {
 
 func main() {
 	paths := make(chan string)
-	updates := make(chan update, 1000)
+	updates := make(chan update, 1000_000)
 	var workersWaitGroup sync.WaitGroup
 	for i := 0; i < runtime.NumCPU()*2; i++ {
 		workersWaitGroup.Add(1)
