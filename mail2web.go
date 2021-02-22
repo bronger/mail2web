@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"sync"
 )
 
 var (
@@ -26,54 +28,87 @@ func parse_backreferences(field string) (result []string) {
 	return
 }
 
+type update struct {
+	message_id string
+	references []string
+}
+
+func process_mail(path string) (update update) {
+	if !only_numbers_regex.MatchString(filepath.Base(path)) {
+		return
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		log.Panic(err)
+	}
+	defer file.Close()
+	message, err := mail.ReadMessage(file)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	match := reference_regex.FindStringSubmatch(message.Header.Get("Message-ID"))
+	if len(match) < 2 {
+		log.Println(path, "has invalid Message-ID")
+		return
+	}
+	update.message_id = match[1]
+	raw_references := message.Header.Get("References")
+	if raw_references != "" {
+		update.references = parse_backreferences(raw_references)
+	}
+	return
+}
+
 func main() {
+	paths := make(chan string)
+	updates := make(chan update, 1000)
+	var workersWaitGroup sync.WaitGroup
+	for i := 0; i < runtime.NumCPU()*2; i++ {
+		workersWaitGroup.Add(1)
+		go func() {
+			for path := range paths {
+				update := process_mail(path)
+				if update.message_id != "" && len(update.references) > 0 {
+					updates <- update
+				}
+			}
+			workersWaitGroup.Done()
+		}()
+	}
+	go func() {
+		if err := filepath.WalkDir("/home/bronger/Mail",
+			func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if d.IsDir() {
+					for _, dir := range excluded_dirs {
+						if dir == d.Name() {
+							return filepath.SkipDir
+						}
+					}
+					return nil
+				}
+				paths <- path
+				return nil
+			}); err != nil {
+			log.Panic(err)
+		}
+		close(paths)
+		workersWaitGroup.Wait()
+		close(updates)
+	}()
 	back_references = make(map[string][]string)
 	children = make(map[string][]string)
-	if err := filepath.WalkDir("/home/bronger/Mail",
-		func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+	for update := range updates {
+		back_references[update.message_id] = update.references
+		for _, reference := range update.references {
+			item, ok := children[reference]
+			if !ok {
+				item = make([]string, 0, 1)
 			}
-			if d.IsDir() {
-				for _, dir := range excluded_dirs {
-					if dir == d.Name() {
-						return filepath.SkipDir
-					}
-				}
-				return nil
-			}
-			if !only_numbers_regex.MatchString(d.Name()) {
-				return nil
-			}
-			file, err := os.Open(path)
-			defer file.Close()
-			if err != nil {
-				log.Panic(err)
-			}
-			message, err := mail.ReadMessage(file)
-			if err != nil {
-				log.Println(err)
-				return nil
-			}
-			match := reference_regex.FindStringSubmatch(message.Header.Get("Message-ID"))
-			if len(match) < 2 {
-				return nil
-			}
-			message_id := match[1]
-			references := message.Header.Get("References")
-			if references != "" {
-				parsed_references := parse_backreferences(references)
-				back_references[message_id] = parsed_references
-				for _, reference := range parsed_references {
-					item, ok := children[reference]
-					if !ok {
-						item = make([]string, 0, 1)
-					}
-					children[reference] = append(item, message_id)
-				}
-			}
-			return nil
-		}); err != nil {
-		log.Panic(err)
+			children[reference] = append(item, update.message_id)
+		}
 	}
 }
