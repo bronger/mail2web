@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"runtime"
 	"sync"
+
+	"github.com/beego/beego/v2/server/web"
 )
 
 var (
@@ -111,4 +113,6 @@ func main() {
 			children[reference] = append(item, update.message_id)
 		}
 	}
+
+	web.Run()
 }
