@@ -24,7 +24,7 @@ type MainController struct {
 	web.Controller
 }
 
-func body(root *html.Node) (*html.Node, error) {
+func getBodyNode(root *html.Node) (*html.Node, error) {
 	var body *html.Node
 	var crawler func(*html.Node)
 	crawler = func(node *html.Node) {
@@ -43,13 +43,21 @@ func body(root *html.Node) (*html.Node, error) {
 	return nil, errors.New("Missing <body> in the node tree")
 }
 
-func renderNode(node *html.Node) string {
+func getBody(html_document string) (string, error) {
+	root, err := html.Parse(strings.NewReader(html_document))
+	if err != nil {
+		return "", err
+	}
+	bodyNode, err := getBodyNode(root)
+	if err != nil {
+		return "", err
+	}
 	var buffer bytes.Buffer
 	writer := io.Writer(&buffer)
-	for child := node.FirstChild; child != nil; child = child.NextSibling {
+	for child := bodyNode.FirstChild; child != nil; child = child.NextSibling {
 		html.Render(writer, child)
 	}
-	return buffer.String()
+	return buffer.String(), nil
 }
 
 func (this *MainController) Get() {
@@ -68,10 +76,7 @@ func (this *MainController) Get() {
 	this.Data["to"] = m.GetHeader("To")
 	this.Data["date"] = m.GetHeader("Date")
 	this.Data["text"] = m.Text
-	html_document, err := html.Parse(strings.NewReader(m.HTML))
+	body, err := getBody(m.HTML)
 	check(err)
-	body_node, err := body(html_document)
-	check(err)
-	body := renderNode(body_node)
 	this.Data["html"] = template.HTML(body)
 }
