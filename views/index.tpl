@@ -25,7 +25,9 @@
 </table>
 <hr>
 {{if .html}}
+<div style="max-width: 40em">
 {{.html}}
+</div>
 {{else}}
 <pre>
 {{.text}}
