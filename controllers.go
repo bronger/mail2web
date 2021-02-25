@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"html/template"
 	"io"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/beego/beego/v2/server/web"
@@ -84,4 +86,24 @@ func (this *MainController) Get() {
 		attachments = append(attachments, current_attachment.FileName)
 	}
 	this.Data["attachments"] = attachments
+}
+
+type AttachmentController struct {
+	web.Controller
+}
+
+func (this *AttachmentController) Get() {
+	folder := this.Ctx.Input.Param(":folder")
+	id := this.Ctx.Input.Param(":id")
+	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
+	check(err)
+	file, err := os.Open("/home/bronger/Mail/" + folder + "/" + id)
+	check(err)
+	defer file.Close()
+	m, err := enmime.ReadEnvelope(file)
+	check(err)
+	this.Ctx.Output.Header("Content-Disposition",
+		fmt.Sprintf("attachment; filename=\"%v\"", m.Attachments[index].FileName))
+	this.Ctx.Output.Header("Content-Type", m.Attachments[index].ContentType)
+	this.Ctx.Output.Body(m.Attachments[index].Content)
 }
