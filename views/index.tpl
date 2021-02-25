@@ -33,5 +33,9 @@
 {{.text}}
 </pre>
 {{end}}
+<h2>Attachments</h2>
+{{range $i, $name := .attachments}}
+<p><a href="{{$.id}}/{{$i}}">{{$name}}</a></p>
+{{end}}
 </body>
 </html>

@@ -79,4 +79,9 @@ func (this *MainController) Get() {
 	body, err := getBody(m.HTML)
 	check(err)
 	this.Data["html"] = template.HTML(body)
+	attachments := make([]string, 0)
+	for _, current_attachment := range m.Attachments {
+		attachments = append(attachments, current_attachment.FileName)
+	}
+	this.Data["attachments"] = attachments
 }
