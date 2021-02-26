@@ -21,6 +21,7 @@ var (
 	backReferences, children                        map[string][]string
 	mailPaths                                       map[string]string
 	backReferencesLock, childrenLock, mailPathsLock sync.RWMutex
+	mailDir                                         string
 )
 
 func parseBackreferences(field string) (result []string) {
@@ -65,6 +66,13 @@ func processMail(path string) (update update) {
 	return
 }
 
+func init() {
+	mailDir = os.Getenv("MAILDIR")
+	if mailDir == "" {
+		mailDir = "/var/lib/mails"
+	}
+}
+
 func main() {
 	paths := make(chan string)
 	updates := make(chan update, 1000_000)
@@ -88,7 +96,7 @@ func main() {
 		}()
 	}
 	go func() {
-		err := filepath.WalkDir("/home/bronger/Mail",
+		err := filepath.WalkDir(mailDir,
 			func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err

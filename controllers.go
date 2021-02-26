@@ -177,7 +177,7 @@ func (this *MainController) Get() {
 	this.Data["folder"] = folder
 	this.Data["id"] = id
 	link := folder + "/" + id
-	file, err := os.Open("/home/bronger/Mail/" + link)
+	file, err := os.Open(path.Join(mailDir, link))
 	check(err)
 	defer func() {
 		err := file.Close()
@@ -213,7 +213,7 @@ func (this *AttachmentController) Get() {
 	id := this.Ctx.Input.Param(":id")
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
-	file, err := os.Open("/home/bronger/Mail/" + folder + "/" + id)
+	file, err := os.Open(path.Join(mailDir, folder, id))
 	check(err)
 	defer func() {
 		err := file.Close()
