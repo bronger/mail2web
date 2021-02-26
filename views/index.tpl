@@ -7,7 +7,13 @@
 {{if .thread}}
 <h2>Thread</h2>
 <ul>
-  <li><a href="../{{$.thread.Link}}"><strong>{{$.thread.From}}:</strong> {{$.thread.Subject}}</a></li>
+  <li>
+    {{if $.thread.Link}}
+    <a href="../{{$.thread.Link}}"><strong>{{$.thread.From}}:</strong> {{$.thread.Subject}}</a>
+    {{else}}
+    <strong>{{$.thread.From}}:</strong> {{$.thread.Subject}}
+    {{end}}
+  </li>
   <ul>
     {{template "thread.tpl" .thread}}
   </ul>

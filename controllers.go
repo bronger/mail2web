@@ -160,13 +160,24 @@ func buildThread(root string) (rootNode *threadNode) {
 	return
 }
 
+func removeCurrentLink(link string, thread *threadNode) *threadNode {
+	if thread.Link == link {
+		thread.Link = ""
+	}
+	for _, child := range thread.Children {
+		removeCurrentLink(link, child)
+	}
+	return thread
+}
+
 func (this *MainController) Get() {
 	folder := this.Ctx.Input.Param(":folder")
 	id := this.Ctx.Input.Param(":id")
 	this.TplName = "index.tpl"
 	this.Data["folder"] = folder
 	this.Data["id"] = id
-	file, err := os.Open("/home/bronger/Mail/" + folder + "/" + id)
+	link := folder + "/" + id
+	file, err := os.Open("/home/bronger/Mail/" + link)
 	check(err)
 	defer func() {
 		err := file.Close()
@@ -189,7 +200,7 @@ func (this *MainController) Get() {
 	this.Data["attachments"] = attachments
 	threadRoot := findThreadRoot(m)
 	if threadRoot != "" {
-		this.Data["thread"] = buildThread(threadRoot)
+		this.Data["thread"] = removeCurrentLink(link, buildThread(threadRoot))
 	}
 }
 
