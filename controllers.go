@@ -45,8 +45,8 @@ func getBodyNode(root *html.Node) (*html.Node, error) {
 	return nil, errors.New("Missing <body> in the node tree")
 }
 
-func getBody(html_document string) (string, error) {
-	root, err := html.Parse(strings.NewReader(html_document))
+func getBody(htmlDocument string) (string, error) {
+	root, err := html.Parse(strings.NewReader(htmlDocument))
 	if err != nil {
 		return "", err
 	}
@@ -82,8 +82,8 @@ func (this *MainController) Get() {
 	check(err)
 	this.Data["html"] = template.HTML(body)
 	attachments := make([]string, 0)
-	for _, current_attachment := range m.Attachments {
-		attachments = append(attachments, current_attachment.FileName)
+	for _, currentAttachment := range m.Attachments {
+		attachments = append(attachments, currentAttachment.FileName)
 	}
 	this.Data["attachments"] = attachments
 }

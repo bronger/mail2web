@@ -14,16 +14,16 @@ import (
 )
 
 var (
-	excluded_dirs = [...]string{"spam-old", "spam", "drafts", "archive", "bogus", "junk", "trash", "sent", "news-sent",
+	excludedDirs = [...]string{"spam-old", "spam", "drafts", "archive", "bogus", "junk", "trash", "sent", "news-sent",
 		"RSS", "spam-junk", "wilson-postmaser", "wilson-postmaster", "wilson-rejected", "spam-reports"}
-	only_numbers_regex        = regexp.MustCompile("\\d+$")
-	reference_regex           = regexp.MustCompile("<([^>]+)")
-	back_references, children map[string][]string
+	onlyNumbersRegex         = regexp.MustCompile("\\d+$")
+	referenceRegex           = regexp.MustCompile("<([^>]+)")
+	backReferences, children map[string][]string
 )
 
-func parse_backreferences(field string) (result []string) {
+func parseBackreferences(field string) (result []string) {
 	result = make([]string, 0)
-	match := reference_regex.FindAllStringSubmatch(field, -1)
+	match := referenceRegex.FindAllStringSubmatch(field, -1)
 	for _, reference := range match {
 		result = append(result, reference[1])
 	}
@@ -31,12 +31,12 @@ func parse_backreferences(field string) (result []string) {
 }
 
 type update struct {
-	message_id string
+	messageId  string
 	references []string
 }
 
-func process_mail(path string) (update update) {
-	if !only_numbers_regex.MatchString(filepath.Base(path)) {
+func processMail(path string) (update update) {
+	if !onlyNumbersRegex.MatchString(filepath.Base(path)) {
 		return
 	}
 	file, err := os.Open(path)
@@ -49,15 +49,15 @@ func process_mail(path string) (update update) {
 		log.Println(err)
 		return
 	}
-	match := reference_regex.FindStringSubmatch(message.Header.Get("Message-ID"))
+	match := referenceRegex.FindStringSubmatch(message.Header.Get("Message-ID"))
 	if len(match) < 2 {
 		log.Println(path, "has invalid Message-ID")
 		return
 	}
-	update.message_id = match[1]
+	update.messageId = match[1]
 	raw_references := message.Header.Get("References")
 	if raw_references != "" {
-		update.references = parse_backreferences(raw_references)
+		update.references = parseBackreferences(raw_references)
 	}
 	return
 }
@@ -70,8 +70,8 @@ func main() {
 		workersWaitGroup.Add(1)
 		go func() {
 			for path := range paths {
-				update := process_mail(path)
-				if update.message_id != "" && len(update.references) > 0 {
+				update := processMail(path)
+				if update.messageId != "" && len(update.references) > 0 {
 					updates <- update
 				}
 			}
@@ -85,7 +85,7 @@ func main() {
 					return err
 				}
 				if d.IsDir() {
-					for _, dir := range excluded_dirs {
+					for _, dir := range excludedDirs {
 						if dir == d.Name() {
 							return filepath.SkipDir
 						}
@@ -101,16 +101,16 @@ func main() {
 		workersWaitGroup.Wait()
 		close(updates)
 	}()
-	back_references = make(map[string][]string)
+	backReferences = make(map[string][]string)
 	children = make(map[string][]string)
 	for update := range updates {
-		back_references[update.message_id] = update.references
+		backReferences[update.messageId] = update.references
 		for _, reference := range update.references {
 			item, ok := children[reference]
 			if !ok {
 				item = make([]string, 0, 1)
 			}
-			children[reference] = append(item, update.message_id)
+			children[reference] = append(item, update.messageId)
 		}
 	}
 
