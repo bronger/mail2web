@@ -42,9 +42,7 @@ func processMail(path string) (update update) {
 		return
 	}
 	file, err := os.Open(path)
-	if err != nil {
-		log.Panic(err)
-	}
+	check(err)
 	defer func() {
 		err := file.Close()
 		check(err)
@@ -90,7 +88,7 @@ func main() {
 		}()
 	}
 	go func() {
-		if err := filepath.WalkDir("/home/bronger/Mail",
+		err := filepath.WalkDir("/home/bronger/Mail",
 			func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err
@@ -105,9 +103,8 @@ func main() {
 				}
 				paths <- path
 				return nil
-			}); err != nil {
-			log.Panic(err)
-		}
+			})
+		check(err)
 		close(paths)
 		workersWaitGroup.Wait()
 		close(updates)
