@@ -1,11 +1,10 @@
-module mail2web
+module github.com/bronger/mail2web
 
 go 1.16
 
 require (
 	github.com/beego/beego/v2 v2.0.1
 	github.com/jhillyerd/enmime v0.8.4
-	github.com/kisielk/errcheck v1.6.0 // indirect
 	golang.org/x/mod v0.4.1 // indirect
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	golang.org/x/sys v0.0.0-20210225134936-a50acf3fe073 // indirect
