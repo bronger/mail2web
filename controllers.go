@@ -7,7 +7,9 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"net/mail"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -63,6 +65,87 @@ func getBody(htmlDocument string) (string, error) {
 	return buffer.String(), nil
 }
 
+type threadNode struct {
+	From, Subject string
+	Link          string
+	Children      []*threadNode
+}
+
+func findThreadRoot(m *enmime.Envelope) (root string) {
+	match := referenceRegex.FindStringSubmatch(m.GetHeader("Message-ID"))
+	if len(match) < 2 {
+		return ""
+	}
+	messageId := match[1]
+	var stepBack func(string, int) (string, int)
+	stepBack = func(messageId string, depth int) (root string, rootDepth int) {
+		if depth > 100 {
+			return
+		}
+		references := backReferences[messageId]
+		if len(references) == 0 {
+			return messageId, depth
+		}
+		for _, id := range references {
+			root_, rootDepth_ := stepBack(id, depth+1)
+			if rootDepth_ > rootDepth {
+				root, rootDepth = root_, rootDepth_
+			}
+		}
+		return
+	}
+	root, _ = stepBack(messageId, 1)
+	return root
+}
+
+func pathToLink(path_ string) string {
+	prefix, id := path.Split(path_)
+	_, folder := path.Split(strings.TrimSuffix(prefix, "/"))
+	return folder + "/" + id
+}
+
+func threadNodeByMessageId(messageId string) *threadNode {
+	mailPathsLock.RLock()
+	path := mailPaths[messageId]
+	mailPathsLock.RUnlock()
+	if path == "" {
+		return nil
+	}
+	file, err := os.Open(path)
+	check(err)
+	defer func() {
+		err := file.Close()
+		check(err)
+	}()
+	message, err := mail.ReadMessage(file)
+	if err != nil {
+		return nil
+	}
+	return &threadNode{
+		message.Header.Get("From"),
+		message.Header.Get("Subject"),
+		pathToLink(path),
+		make([]*threadNode, 0),
+	}
+}
+
+func buildThread(root string) (rootNode *threadNode) {
+	rootNode = threadNodeByMessageId(root)
+	if rootNode == nil {
+		return
+	}
+	childrenLock.RLock()
+	root_children := children[root]
+	childrenLock.RUnlock()
+	for _, child := range root_children {
+		childNode := buildThread(child)
+		if childNode != nil {
+			rootNode.Children = append(rootNode.Children, childNode)
+		}
+	}
+	return
+}
+
 func (this *MainController) Get() {
 	folder := this.Ctx.Input.Param(":folder")
 	id := this.Ctx.Input.Param(":id")
@@ -90,6 +173,10 @@ func (this *MainController) Get() {
 		attachments = append(attachments, currentAttachment.FileName)
 	}
 	this.Data["attachments"] = attachments
+	threadRoot := findThreadRoot(m)
+	if threadRoot != "" {
+		this.Data["thread"] = buildThread(threadRoot)
+	}
 }
 
 type AttachmentController struct {

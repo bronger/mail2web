@@ -4,6 +4,12 @@
 </head>
 <body>
 <h1>Mail {{.folder}}/{{.id}}</h1>
+{{if .thread}}
+<h2>Thread</h2>
+<ul>
+  {{template "thread.tpl" .thread}}
+</ul>
+{{end}}
 <h2>Mail content</h2>
 <table border="1">
   <tr>
