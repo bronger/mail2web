@@ -19,6 +19,8 @@ var (
 	onlyNumbersRegex         = regexp.MustCompile("\\d+$")
 	referenceRegex           = regexp.MustCompile("<([^>]+)")
 	backReferences, children map[string][]string
+	mailPaths                map[string]string
+	mailPathsLock            sync.RWMutex
 )
 
 func parseBackreferences(field string) (result []string) {
@@ -65,14 +67,20 @@ func processMail(path string) (update update) {
 func main() {
 	paths := make(chan string)
 	updates := make(chan update, 1000_000)
+	mailPaths = make(map[string]string)
 	var workersWaitGroup sync.WaitGroup
 	for i := 0; i < runtime.NumCPU()*2; i++ {
 		workersWaitGroup.Add(1)
 		go func() {
 			for path := range paths {
 				update := processMail(path)
-				if update.messageId != "" && len(update.references) > 0 {
-					updates <- update
+				if update.messageId != "" {
+					mailPathsLock.Lock()
+					mailPaths[update.messageId] = path
+					mailPathsLock.Unlock()
+					if len(update.references) > 0 {
+						updates <- update
+					}
 				}
 			}
 			workersWaitGroup.Done()
