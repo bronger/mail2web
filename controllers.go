@@ -24,10 +24,6 @@ func check(e error) {
 	}
 }
 
-type MainController struct {
-	web.Controller
-}
-
 func getBodyNode(root *html.Node) (*html.Node, error) {
 	var body *html.Node
 	var crawler func(*html.Node)
@@ -65,12 +61,6 @@ func getBody(htmlDocument string) (string, error) {
 	return buffer.String(), nil
 }
 
-type threadNode struct {
-	From, Subject string
-	Link          string
-	Children      []*threadNode
-}
-
 func findThreadRoot(m *enmime.Envelope) (root string) {
 	match := referenceRegex.FindStringSubmatch(m.GetHeader("Message-ID"))
 	if len(match) < 2 {
@@ -102,6 +92,12 @@ func pathToLink(path_ string) string {
 	prefix, id := path.Split(path_)
 	_, folder := path.Split(strings.TrimSuffix(prefix, "/"))
 	return folder + "/" + id
+}
+
+type threadNode struct {
+	From, Subject string
+	Link          string
+	Children      []*threadNode
 }
 
 func threadNodeByMessageId(messageId string) *threadNode {
@@ -168,6 +164,10 @@ func removeCurrentLink(link string, thread *threadNode) *threadNode {
 		removeCurrentLink(link, child)
 	}
 	return thread
+}
+
+type MainController struct {
+	web.Controller
 }
 
 func (this *MainController) Get() {
