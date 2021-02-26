@@ -137,7 +137,21 @@ func buildThread(root string) (rootNode *threadNode) {
 	childrenLock.RLock()
 	root_children := children[root]
 	childrenLock.RUnlock()
+	children := make(map[string]bool)
 	for _, child := range root_children {
+		children[child] = true
+	}
+	for _, child := range root_children {
+		grandChild := false
+		for _, backReference := range backReferences[child] {
+			if children[backReference] {
+				grandChild = true
+				break
+			}
+		}
+		if grandChild {
+			continue
+		}
 		childNode := buildThread(child)
 		if childNode != nil {
 			rootNode.Children = append(rootNode.Children, childNode)
