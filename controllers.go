@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"html/template"
@@ -22,6 +23,21 @@ func check(e error) {
 	if e != nil {
 		log.Panic(e)
 	}
+}
+
+func getLogin(authHeader string) (login string) {
+	components := strings.Split(authHeader, " ")
+	if len(components) != 2 || components[0] != "Basic" {
+		log.Panic("Invalid Authorization header " + authHeader)
+	}
+	rawField, err := base64.StdEncoding.DecodeString(components[1])
+	check(err)
+	field := string(rawField)
+	components = strings.SplitN(field, ":", 2)
+	if len(components) != 2 {
+		log.Panic("Invalid Authorization login+password string: " + field)
+	}
+	return components[0]
 }
 
 func getBodyNode(root *html.Node) (*html.Node, error) {
@@ -171,6 +187,8 @@ type MainController struct {
 }
 
 func (this *MainController) Get() {
+	login := getLogin(this.Ctx.Input.Header("Authorization"))
+	log.Println(login)
 	folder := this.Ctx.Input.Param(":folder")
 	id := this.Ctx.Input.Param(":id")
 	this.TplName = "index.tpl"
