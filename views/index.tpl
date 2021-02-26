@@ -7,7 +7,10 @@
 {{if .thread}}
 <h2>Thread</h2>
 <ul>
-  {{template "thread.tpl" .thread}}
+  <li><a href="../{{$.thread.Link}}"><strong>{{$.thread.From}}:</strong> {{$.thread.Subject}}</a></li>
+  <ul>
+    {{template "thread.tpl" .thread}}
+  </ul>
 </ul>
 {{end}}
 <h2>Mail content</h2>
