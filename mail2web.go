@@ -16,11 +16,11 @@ import (
 var (
 	excludedDirs = [...]string{"spam-old", "spam", "drafts", "archive", "bogus", "junk", "trash", "sent", "news-sent",
 		"RSS", "spam-junk", "wilson-postmaser", "wilson-postmaster", "wilson-rejected", "spam-reports"}
-	onlyNumbersRegex         = regexp.MustCompile("\\d+$")
-	referenceRegex           = regexp.MustCompile("<([^>]+)")
-	backReferences, children map[string][]string
-	mailPaths                map[string]string
-	mailPathsLock            sync.RWMutex
+	onlyNumbersRegex                                = regexp.MustCompile("\\d+$")
+	referenceRegex                                  = regexp.MustCompile("<([^>]+)")
+	backReferences, children                        map[string][]string
+	mailPaths                                       map[string]string
+	backReferencesLock, childrenLock, mailPathsLock sync.RWMutex
 )
 
 func parseBackreferences(field string) (result []string) {
