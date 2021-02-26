@@ -45,7 +45,10 @@ func processMail(path string) (update update) {
 	if err != nil {
 		log.Panic(err)
 	}
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		check(err)
+	}()
 	message, err := mail.ReadMessage(file)
 	if err != nil {
 		log.Println(err)

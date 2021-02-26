@@ -57,7 +57,8 @@ func getBody(htmlDocument string) (string, error) {
 	var buffer bytes.Buffer
 	writer := io.Writer(&buffer)
 	for child := bodyNode.FirstChild; child != nil; child = child.NextSibling {
-		html.Render(writer, child)
+		err := html.Render(writer, child)
+		check(err)
 	}
 	return buffer.String(), nil
 }
@@ -70,7 +71,10 @@ func (this *MainController) Get() {
 	this.Data["id"] = id
 	file, err := os.Open("/home/bronger/Mail/" + folder + "/" + id)
 	check(err)
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		check(err)
+	}()
 	m, err := enmime.ReadEnvelope(file)
 	check(err)
 	this.Data["from"] = m.GetHeader("From")
@@ -99,11 +103,15 @@ func (this *AttachmentController) Get() {
 	check(err)
 	file, err := os.Open("/home/bronger/Mail/" + folder + "/" + id)
 	check(err)
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		check(err)
+	}()
 	m, err := enmime.ReadEnvelope(file)
 	check(err)
 	this.Ctx.Output.Header("Content-Disposition",
 		fmt.Sprintf("attachment; filename=\"%v\"", m.Attachments[index].FileName))
 	this.Ctx.Output.Header("Content-Type", m.Attachments[index].ContentType)
-	this.Ctx.Output.Body(m.Attachments[index].Content)
+	err = this.Ctx.Output.Body(m.Attachments[index].Content)
+	check(err)
 }
