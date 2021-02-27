@@ -18,25 +18,25 @@ var (
 		"RSS", "spam-junk", "wilson-postmaser", "wilson-postmaster", "wilson-rejected", "spam-reports"}
 	onlyNumbersRegex                                = regexp.MustCompile("\\d+$")
 	referenceRegex                                  = regexp.MustCompile("<([^>]+)")
-	backReferences, children                        map[string][]string
+	backReferences, children                        map[string]map[string]bool
 	mailPaths                                       map[string]string
 	backReferencesLock, childrenLock, mailPathsLock sync.RWMutex
 	mailDir                                         string
 	updates                                         chan update
 )
 
-func parseBackreferences(field string) (result []string) {
-	result = make([]string, 0)
+func parseBackreferences(field string) (result map[string]bool) {
+	result = make(map[string]bool)
 	match := referenceRegex.FindAllStringSubmatch(field, -1)
 	for _, reference := range match {
-		result = append(result, reference[1])
+		result[reference[1]] = true
 	}
 	return
 }
 
 type update struct {
 	messageId  string
-	references []string
+	references map[string]bool
 }
 
 func processMail(path string) (update update) {
@@ -72,8 +72,8 @@ func init() {
 	if mailDir == "" {
 		mailDir = "/var/lib/mails"
 	}
-	backReferences = make(map[string][]string)
-	children = make(map[string][]string)
+	backReferences = make(map[string]map[string]bool)
+	children = make(map[string]map[string]bool)
 	mailPaths = make(map[string]string)
 	updates = make(chan update, 1000_000)
 	go processUpdates()
@@ -85,15 +85,15 @@ func processUpdates() {
 		backReferencesLock.Lock()
 		backReferences[update.messageId] = update.references
 		backReferencesLock.Unlock()
-		for _, reference := range update.references {
+		for reference, _ := range update.references {
 			childrenLock.RLock()
-			item, ok := children[reference]
+			_, ok := children[reference]
 			childrenLock.RUnlock()
-			if !ok {
-				item = make([]string, 0, 1)
-			}
 			childrenLock.Lock()
-			children[reference] = append(item, update.messageId)
+			if !ok {
+				children[reference] = make(map[string]bool)
+			}
+			children[reference][update.messageId] = true
 			childrenLock.Unlock()
 		}
 	}

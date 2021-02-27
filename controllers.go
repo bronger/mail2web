@@ -92,7 +92,7 @@ func findThreadRoot(m *enmime.Envelope) (root string) {
 		if len(references) == 0 {
 			return messageId, depth
 		}
-		for _, id := range references {
+		for id, _ := range references {
 			root_, rootDepth_ := stepBack(id, depth+1)
 			if rootDepth_ > rootDepth {
 				root, rootDepth = root_, rootDepth_
@@ -150,12 +150,12 @@ func buildThread(root string) (rootNode *threadNode) {
 	root_children := children[root]
 	childrenLock.RUnlock()
 	children := make(map[string]bool)
-	for _, child := range root_children {
+	for child, _ := range root_children {
 		children[child] = true
 	}
-	for _, child := range root_children {
+	for child, _ := range root_children {
 		grandChild := false
-		for _, backReference := range backReferences[child] {
+		for backReference, _ := range backReferences[child] {
 			if children[backReference] {
 				grandChild = true
 				break
