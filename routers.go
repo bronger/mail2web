@@ -7,4 +7,5 @@ import (
 func init() {
 	web.Router("/:folder/:id:int", &MainController{})
 	web.Router("/:folder/:id:int/:index:int", &AttachmentController{})
+	web.Router("/healthz", &HealthController{})
 }

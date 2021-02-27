@@ -245,3 +245,11 @@ func (this *AttachmentController) Get() {
 	err = this.Ctx.Output.Body(m.Attachments[index].Content)
 	check(err)
 }
+
+type HealthController struct {
+	web.Controller
+}
+
+func (this *HealthController) Get() {
+	this.Ctx.Output.Body([]byte{})
+}
