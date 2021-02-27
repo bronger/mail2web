@@ -14,8 +14,7 @@ import (
 )
 
 var (
-	excludedDirs = [...]string{"spam-old", "spam", "drafts", "archive", "bogus", "junk", "trash", "sent", "news-sent",
-		"RSS", "spam-junk", "wilson-postmaser", "wilson-postmaster", "wilson-rejected", "spam-reports"}
+	includedDirs                                    []string
 	onlyNumbersRegex                                = regexp.MustCompile("\\d+$")
 	referenceRegex                                  = regexp.MustCompile("<([^>]+)")
 	backReferences, children                        map[string]map[string]bool
@@ -72,6 +71,7 @@ func init() {
 	if mailDir == "" {
 		mailDir = "/var/lib/mails"
 	}
+	includedDirs = strings.Split(os.Getenv("MAIL_FOLDERS"), ",")
 	backReferences = make(map[string]map[string]bool)
 	children = make(map[string]map[string]bool)
 	mailPaths = make(map[string]string)
@@ -119,23 +119,24 @@ func populateGlobalMaps() {
 			workersWaitGroup.Done()
 		}()
 	}
-	err := filepath.WalkDir(mailDir,
-		func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() {
-				for _, dir := range excludedDirs {
-					if dir == d.Name() {
+	for _, dir := range includedDirs {
+		currentDir := path.Join(mailDir, dir)
+		err := filepath.WalkDir(currentDir,
+			func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if d.IsDir() {
+					if path != currentDir {
 						return filepath.SkipDir
 					}
+					return nil
 				}
+				paths <- path
 				return nil
-			}
-			paths <- path
-			return nil
-		})
-	check(err)
+			})
+		check(err)
+	}
 	close(paths)
 	workersWaitGroup.Wait()
 }
