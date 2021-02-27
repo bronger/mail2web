@@ -120,13 +120,19 @@ func main() {
 	backReferences = make(map[string][]string)
 	children = make(map[string][]string)
 	for update := range updates {
+		backReferencesLock.Lock()
 		backReferences[update.messageId] = update.references
+		backReferencesLock.Unlock()
 		for _, reference := range update.references {
+			childrenLock.RLock()
 			item, ok := children[reference]
+			childrenLock.RUnlock()
 			if !ok {
 				item = make([]string, 0, 1)
 			}
+			childrenLock.Lock()
 			children[reference] = append(item, update.messageId)
+			childrenLock.Unlock()
 		}
 	}
 
