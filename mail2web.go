@@ -22,6 +22,7 @@ var (
 	mailPaths                                       map[string]string
 	backReferencesLock, childrenLock, mailPathsLock sync.RWMutex
 	mailDir                                         string
+	updates                                         chan update
 )
 
 func parseBackreferences(field string) (result []string) {
@@ -71,12 +72,35 @@ func init() {
 	if mailDir == "" {
 		mailDir = "/var/lib/mails"
 	}
+	backReferences = make(map[string][]string)
+	children = make(map[string][]string)
+	mailPaths = make(map[string]string)
+	updates = make(chan update, 1000_000)
+	go processUpdates()
+	populateGlobalMaps()
 }
 
-func main() {
+func processUpdates() {
+	for update := range updates {
+		backReferencesLock.Lock()
+		backReferences[update.messageId] = update.references
+		backReferencesLock.Unlock()
+		for _, reference := range update.references {
+			childrenLock.RLock()
+			item, ok := children[reference]
+			childrenLock.RUnlock()
+			if !ok {
+				item = make([]string, 0, 1)
+			}
+			childrenLock.Lock()
+			children[reference] = append(item, update.messageId)
+			childrenLock.Unlock()
+		}
+	}
+}
+
+func populateGlobalMaps() {
 	paths := make(chan string)
-	updates := make(chan update, 1000_000)
-	mailPaths = make(map[string]string)
 	var workersWaitGroup sync.WaitGroup
 	for i := 0; i < runtime.NumCPU()*2; i++ {
 		workersWaitGroup.Add(1)
@@ -95,46 +119,27 @@ func main() {
 			workersWaitGroup.Done()
 		}()
 	}
-	go func() {
-		err := filepath.WalkDir(mailDir,
-			func(path string, d fs.DirEntry, err error) error {
-				if err != nil {
-					return err
-				}
-				if d.IsDir() {
-					for _, dir := range excludedDirs {
-						if dir == d.Name() {
-							return filepath.SkipDir
-						}
-					}
-					return nil
-				}
-				paths <- path
-				return nil
-			})
-		check(err)
-		close(paths)
-		workersWaitGroup.Wait()
-		close(updates)
-	}()
-	backReferences = make(map[string][]string)
-	children = make(map[string][]string)
-	for update := range updates {
-		backReferencesLock.Lock()
-		backReferences[update.messageId] = update.references
-		backReferencesLock.Unlock()
-		for _, reference := range update.references {
-			childrenLock.RLock()
-			item, ok := children[reference]
-			childrenLock.RUnlock()
-			if !ok {
-				item = make([]string, 0, 1)
+	err := filepath.WalkDir(mailDir,
+		func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
 			}
-			childrenLock.Lock()
-			children[reference] = append(item, update.messageId)
-			childrenLock.Unlock()
-		}
-	}
+			if d.IsDir() {
+				for _, dir := range excludedDirs {
+					if dir == d.Name() {
+						return filepath.SkipDir
+					}
+				}
+				return nil
+			}
+			paths <- path
+			return nil
+		})
+	check(err)
+	close(paths)
+	workersWaitGroup.Wait()
+}
 
+func main() {
 	web.Run()
 }
