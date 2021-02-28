@@ -10,7 +10,7 @@ import (
 	"log"
 	"net/mail"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -105,8 +105,8 @@ func findThreadRoot(m *enmime.Envelope) (root string) {
 }
 
 func pathToLink(path_ string) string {
-	prefix, id := path.Split(path_)
-	_, folder := path.Split(strings.TrimSuffix(prefix, "/"))
+	prefix, id := filepath.Split(path_)
+	_, folder := filepath.Split(strings.TrimSuffix(prefix, "/"))
 	return folder + "/" + id
 }
 
@@ -195,7 +195,7 @@ func (this *MainController) Get() {
 	this.Data["folder"] = folder
 	this.Data["id"] = id
 	link := folder + "/" + id
-	file, err := os.Open(path.Join(mailDir, link))
+	file, err := os.Open(filepath.Join(mailDir, link))
 	check(err)
 	defer func() {
 		err := file.Close()
@@ -231,7 +231,7 @@ func (this *AttachmentController) Get() {
 	id := this.Ctx.Input.Param(":id")
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
-	file, err := os.Open(path.Join(mailDir, folder, id))
+	file, err := os.Open(filepath.Join(mailDir, folder, id))
 	check(err)
 	defer func() {
 		err := file.Close()

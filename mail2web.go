@@ -120,7 +120,7 @@ func populateGlobalMaps() {
 		}()
 	}
 	for _, dir := range includedDirs {
-		currentDir := path.Join(mailDir, dir)
+		currentDir := filepath.Join(mailDir, dir)
 		err := filepath.WalkDir(currentDir,
 			func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
