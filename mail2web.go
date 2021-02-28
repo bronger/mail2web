@@ -106,8 +106,7 @@ func populateGlobalMaps() {
 		workersWaitGroup.Add(1)
 		go func() {
 			for path := range paths {
-				update := processMail(path)
-				if update.messageId != "" {
+				if update := processMail(path); update.messageId != "" {
 					mailPathsLock.Lock()
 					mailPaths[update.messageId] = path
 					mailPathsLock.Unlock()
