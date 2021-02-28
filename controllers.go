@@ -251,5 +251,6 @@ type HealthController struct {
 }
 
 func (this *HealthController) Get() {
-	this.Ctx.Output.Body([]byte{})
+	err := this.Ctx.Output.Body([]byte{})
+	check(err)
 }
