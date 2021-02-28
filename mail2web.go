@@ -17,7 +17,7 @@ import (
 
 var (
 	includedDirs                                    []string
-	onlyNumbersRegex                                = regexp.MustCompile("\\d+$")
+	onlyNumbersRegex                                = regexp.MustCompile("^\\d+$")
 	referenceRegex                                  = regexp.MustCompile("<([^>]+)")
 	backReferences, children                        map[string]map[string]bool
 	mailPaths                                       map[string]string
