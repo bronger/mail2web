@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/beego/beego/v2/server/web"
+	"github.com/fsnotify/fsnotify"
 )
 
 var (
@@ -34,6 +36,7 @@ func parseBackreferences(field string) (result map[string]bool) {
 }
 
 type update struct {
+	delete     bool
 	messageId  string
 	references map[string]bool
 }
@@ -82,23 +85,35 @@ func init() {
 	updates = make(chan update, 1000_000)
 	go processUpdates()
 	populateGlobalMaps()
+	setUpWatcher()
 }
 
 func processUpdates() {
 	for update := range updates {
-		backReferencesLock.Lock()
-		backReferences[update.messageId] = update.references
-		backReferencesLock.Unlock()
-		for reference, _ := range update.references {
-			childrenLock.RLock()
-			_, ok := children[reference]
-			childrenLock.RUnlock()
+		if update.delete {
+			backReferencesLock.Lock()
+			delete(backReferences, update.messageId)
+			backReferencesLock.Unlock()
 			childrenLock.Lock()
-			if !ok {
-				children[reference] = make(map[string]bool)
+			for _, currentChildren := range children {
+				delete(currentChildren, update.messageId)
 			}
-			children[reference][update.messageId] = true
 			childrenLock.Unlock()
+		} else {
+			backReferencesLock.Lock()
+			backReferences[update.messageId] = update.references
+			backReferencesLock.Unlock()
+			for reference, _ := range update.references {
+				childrenLock.RLock()
+				_, ok := children[reference]
+				childrenLock.RUnlock()
+				childrenLock.Lock()
+				if !ok {
+					children[reference] = make(map[string]bool)
+				}
+				children[reference][update.messageId] = true
+				childrenLock.Unlock()
+			}
 		}
 	}
 }
@@ -142,6 +157,60 @@ func populateGlobalMaps() {
 	}
 	close(paths)
 	workersWaitGroup.Wait()
+}
+
+func setUpWatcher() {
+	watcher, err := fsnotify.NewWatcher()
+	check(err)
+
+	go func() {
+		for {
+			select {
+			case event := <-watcher.Events:
+				if event.Op&fsnotify.Create == fsnotify.Create {
+					if update := processMail(event.Name); update.messageId != "" {
+						log.Println("WATCHER: created file:", event.Name)
+						mailPathsLock.Lock()
+						mailPaths[update.messageId] = event.Name
+						mailPathsLock.Unlock()
+						if len(update.references) > 0 {
+							updates <- update
+						}
+					}
+				} else if event.Op&fsnotify.Remove == fsnotify.Remove ||
+					event.Op&fsnotify.Rename == fsnotify.Rename {
+					if isEligibleMailPath(event.Name) {
+						var messageId string
+						mailPathsLock.RLock()
+						for currentMessageId, path := range mailPaths {
+							if path == event.Name {
+								messageId = currentMessageId
+								break
+							}
+						}
+						mailPathsLock.RUnlock()
+						if messageId != "" {
+							log.Println("WATCHER: deleted file:", event.Name)
+							mailPathsLock.Lock()
+							delete(mailPaths, messageId)
+							mailPathsLock.Unlock()
+							updates <- update{
+								delete:    true,
+								messageId: messageId}
+						}
+					}
+				}
+			case err := <-watcher.Errors:
+				check(err)
+			}
+		}
+	}()
+
+	for _, folder := range includedDirs {
+		absDir := filepath.Join(mailDir, folder)
+		err = watcher.Add(absDir)
+		check(err)
+	}
 }
 
 func main() {
