@@ -38,8 +38,12 @@ type update struct {
 	references map[string]bool
 }
 
+func isEligibleMailPath(path string) bool {
+	return onlyNumbersRegex.MatchString(filepath.Base(path))
+}
+
 func processMail(path string) (update update) {
-	if !onlyNumbersRegex.MatchString(filepath.Base(path)) {
+	if !isEligibleMailPath(path) {
 		return
 	}
 	file, err := os.Open(path)
