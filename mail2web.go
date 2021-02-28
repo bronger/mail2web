@@ -91,14 +91,19 @@ func init() {
 func processUpdates() {
 	for update := range updates {
 		if update.delete {
-			backReferencesLock.Lock()
-			delete(backReferences, update.messageId)
-			backReferencesLock.Unlock()
-			childrenLock.Lock()
-			for _, currentChildren := range children {
-				delete(currentChildren, update.messageId)
+			backReferencesLock.RLock()
+			formerBackReferences, ok := backReferences[update.messageId]
+			backReferencesLock.RUnlock()
+			if ok {
+				backReferencesLock.Lock()
+				delete(backReferences, update.messageId)
+				backReferencesLock.Unlock()
+				childrenLock.Lock()
+				for ancestor, _ := range formerBackReferences {
+					delete(children[ancestor], update.messageId)
+				}
+				childrenLock.Unlock()
 			}
-			childrenLock.Unlock()
 		} else {
 			backReferencesLock.Lock()
 			backReferences[update.messageId] = update.references
