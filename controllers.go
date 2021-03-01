@@ -240,7 +240,7 @@ func (this *MainController) Get() {
 	if threadRoot != "" {
 		this.Data["thread"] = removeCurrentLink(link, buildThread(threadRoot))
 	}
-	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id, linkByMessageId(threadRoot)) {
+	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id, linkOrMessageId(threadRoot)) {
 		this.Abort("403")
 	}
 	this.Data["from"] = m.GetHeader("From")
@@ -262,11 +262,15 @@ type AttachmentController struct {
 	web.Controller
 }
 
-func linkByMessageId(messageId string) string {
+func linkOrMessageId(messageId string) string {
 	mailPathsLock.RLock()
 	path := mailPaths[messageId]
 	mailPathsLock.RUnlock()
-	return pathToLink(path)
+	if path == "" {
+		return messageId
+	} else {
+		return pathToLink(path)
+	}
 }
 
 func (this *AttachmentController) Get() {
@@ -283,7 +287,7 @@ func (this *AttachmentController) Get() {
 	m, err := enmime.ReadEnvelope(file)
 	check(err)
 	threadRoot := findThreadRoot(m)
-	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id, linkByMessageId(threadRoot)) {
+	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id, linkOrMessageId(threadRoot)) {
 		this.Abort("403")
 	}
 	this.Ctx.Output.Header("Content-Disposition",
