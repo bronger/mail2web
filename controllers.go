@@ -9,6 +9,8 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"mime"
+	"net/mail"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -116,6 +118,17 @@ type threadNode struct {
 	Children      []*threadNode
 }
 
+func decodeRFC2047(header string) string {
+	dec := new(mime.WordDecoder)
+	result, err := dec.DecodeHeader(header)
+	if err == nil {
+		return result
+	} else {
+		log.Printf("RFC2047 decoding error:", err)
+		return header
+	}
+}
+
 func threadNodeByMessageId(messageId string) *threadNode {
 	mailPathsLock.RLock()
 	path := mailPaths[messageId]
@@ -134,11 +147,11 @@ func threadNodeByMessageId(messageId string) *threadNode {
 		err := file.Close()
 		check(err)
 	}()
-	message, err := enmime.ReadEnvelope(file)
+	message, err := mail.ReadMessage(file)
 	var from, subject string
 	if err == nil {
-		from = message.GetHeader("From")
-		subject = message.GetHeader("Subject")
+		from = decodeRFC2047(message.Header.Get("From"))
+		subject = decodeRFC2047(message.Header.Get("Subject"))
 	} else {
 		from = "unknown"
 		subject = "unknown"
