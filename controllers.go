@@ -121,7 +121,12 @@ func threadNodeByMessageId(messageId string) *threadNode {
 	path := mailPaths[messageId]
 	mailPathsLock.RUnlock()
 	if path == "" {
-		return nil
+		return &threadNode{
+			"unknown",
+			"unknown",
+			"",
+			make([]*threadNode, 0),
+		}
 	}
 	file, err := os.Open(path)
 	check(err)
@@ -130,12 +135,17 @@ func threadNodeByMessageId(messageId string) *threadNode {
 		check(err)
 	}()
 	message, err := mail.ReadMessage(file)
-	if err != nil {
-		return nil
+	var from, subject string
+	if err == nil {
+		from = message.Header.Get("From")
+		subject = message.Header.Get("Subject")
+	} else {
+		from = "unknown"
+		subject = "unknown"
 	}
 	return &threadNode{
-		message.Header.Get("From"),
-		message.Header.Get("Subject"),
+		from,
+		subject,
 		pathToLink(path),
 		make([]*threadNode, 0),
 	}
@@ -143,9 +153,6 @@ func threadNodeByMessageId(messageId string) *threadNode {
 
 func buildThread(root string) (rootNode *threadNode) {
 	rootNode = threadNodeByMessageId(root)
-	if rootNode == nil {
-		return
-	}
 	childrenLock.RLock()
 	root_children := children[root]
 	childrenLock.RUnlock()
