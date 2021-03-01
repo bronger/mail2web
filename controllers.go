@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/fs"
 	"log"
-	"net/mail"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -135,11 +134,11 @@ func threadNodeByMessageId(messageId string) *threadNode {
 		err := file.Close()
 		check(err)
 	}()
-	message, err := mail.ReadMessage(file)
+	message, err := enmime.ReadEnvelope(file)
 	var from, subject string
 	if err == nil {
-		from = message.Header.Get("From")
-		subject = message.Header.Get("Subject")
+		from = message.GetHeader("From")
+		subject = message.GetHeader("Subject")
 	} else {
 		from = "unknown"
 		subject = "unknown"
