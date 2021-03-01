@@ -187,10 +187,11 @@ type MainController struct {
 }
 
 func (this *MainController) Get() {
-	login := getLogin(this.Ctx.Input.Header("Authorization"))
-	log.Println(login)
 	folder := this.Ctx.Input.Param(":folder")
 	id := this.Ctx.Input.Param(":id")
+	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id) {
+		this.Abort("403")
+	}
 	this.TplName = "index.tpl"
 	this.Data["folder"] = folder
 	this.Data["id"] = id
@@ -229,6 +230,9 @@ type AttachmentController struct {
 func (this *AttachmentController) Get() {
 	folder := this.Ctx.Input.Param(":folder")
 	id := this.Ctx.Input.Param(":id")
+	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id) {
+		this.Abort("403")
+	}
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
 	file, err := os.Open(filepath.Join(mailDir, folder, id))
