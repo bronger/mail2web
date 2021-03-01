@@ -13,6 +13,7 @@ import (
 	"net/mail"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -113,6 +114,7 @@ func pathToLink(path_ string) string {
 }
 
 type threadNode struct {
+	MessageId     string
 	From, Subject string
 	Link          string
 	Children      []*threadNode
@@ -135,6 +137,7 @@ func threadNodeByMessageId(messageId string) *threadNode {
 	mailPathsLock.RUnlock()
 	if path == "" {
 		return &threadNode{
+			messageId,
 			"unknown",
 			"unknown (Message-ID: <" + messageId + ">)",
 			"",
@@ -157,6 +160,7 @@ func threadNodeByMessageId(messageId string) *threadNode {
 		subject = "unknown"
 	}
 	return &threadNode{
+		messageId,
 		from,
 		subject,
 		pathToLink(path),
@@ -189,6 +193,11 @@ func buildThread(root string) (rootNode *threadNode) {
 			rootNode.Children = append(rootNode.Children, childNode)
 		}
 	}
+	timestampsLock.RLock()
+	sort.SliceStable(rootNode.Children, func(i, j int) bool {
+		return timestamps[rootNode.Children[i].MessageId].Before(timestamps[rootNode.Children[j].MessageId])
+	})
+	timestampsLock.RUnlock()
 	return
 }
 

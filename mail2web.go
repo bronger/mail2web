@@ -11,21 +11,23 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/beego/beego/v2/server/web"
 	"github.com/fsnotify/fsnotify"
 )
 
 var (
-	includedDirs                                    []string
-	onlyNumbersRegex                                = regexp.MustCompile("^\\d+$")
-	referenceRegex                                  = regexp.MustCompile("<([^>]+)")
-	backReferences, children                        map[string]map[string]bool
-	mailPaths                                       map[string]string
-	backReferencesLock, childrenLock, mailPathsLock sync.RWMutex
-	mailDir                                         string
-	updates                                         chan update
-	isAllowed                                       func(string, string, string, string) bool
+	includedDirs                                                    []string
+	onlyNumbersRegex                                                = regexp.MustCompile("^\\d+$")
+	referenceRegex                                                  = regexp.MustCompile("<([^>]+)")
+	backReferences, children                                        map[string]map[string]bool
+	mailPaths                                                       map[string]string
+	timestamps                                                      map[string]time.Time
+	backReferencesLock, childrenLock, mailPathsLock, timestampsLock sync.RWMutex
+	mailDir                                                         string
+	updates                                                         chan update
+	isAllowed                                                       func(string, string, string, string) bool
 )
 
 func parseBackreferences(field string) (result map[string]bool) {
@@ -41,6 +43,7 @@ type update struct {
 	delete     bool
 	messageId  string
 	references map[string]bool
+	timestamp  time.Time
 }
 
 func isEligibleMailPath(path string) bool {
@@ -68,6 +71,7 @@ func processMail(path string) (update update) {
 		return
 	}
 	update.messageId = match[1]
+	update.timestamp, _ = mail.ParseDate(message.Header.Get("Date"))
 	raw_references := message.Header.Get("References")
 	if raw_references != "" {
 		update.references = parseBackreferences(raw_references)
@@ -84,6 +88,7 @@ func init() {
 	backReferences = make(map[string]map[string]bool)
 	children = make(map[string]map[string]bool)
 	mailPaths = make(map[string]string)
+	timestamps = make(map[string]time.Time)
 	updates = make(chan update, 1000_000)
 	go processUpdates()
 	populateGlobalMaps()
@@ -111,6 +116,9 @@ func processUpdates() {
 				}
 				childrenLock.Unlock()
 			}
+			timestampsLock.Lock()
+			delete(timestamps, update.messageId)
+			timestampsLock.Unlock()
 		} else {
 			backReferencesLock.Lock()
 			backReferences[update.messageId] = update.references
@@ -126,6 +134,9 @@ func processUpdates() {
 				children[reference][update.messageId] = true
 				childrenLock.Unlock()
 			}
+			timestampsLock.Lock()
+			timestamps[update.messageId] = update.timestamp
+			timestampsLock.Unlock()
 		}
 	}
 }
