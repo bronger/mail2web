@@ -123,7 +123,7 @@ func threadNodeByMessageId(messageId string) *threadNode {
 	if path == "" {
 		return &threadNode{
 			"unknown",
-			"unknown",
+			"unknown (Message-ID: <" + messageId + ">)",
 			"",
 			make([]*threadNode, 0),
 		}
