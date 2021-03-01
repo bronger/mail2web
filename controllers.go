@@ -197,9 +197,6 @@ type MainController struct {
 func (this *MainController) Get() {
 	folder := this.Ctx.Input.Param(":folder")
 	id := this.Ctx.Input.Param(":id")
-	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id) {
-		this.Abort("403")
-	}
 	this.TplName = "index.tpl"
 	this.Data["folder"] = folder
 	this.Data["id"] = id
@@ -215,6 +212,13 @@ func (this *MainController) Get() {
 	}()
 	m, err := enmime.ReadEnvelope(file)
 	check(err)
+	threadRoot := findThreadRoot(m)
+	if threadRoot != "" {
+		this.Data["thread"] = removeCurrentLink(link, buildThread(threadRoot))
+	}
+	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id, linkByMessageId(threadRoot)) {
+		this.Abort("403")
+	}
 	this.Data["from"] = m.GetHeader("From")
 	this.Data["subject"] = m.GetHeader("Subject")
 	this.Data["to"] = m.GetHeader("To")
@@ -228,22 +232,22 @@ func (this *MainController) Get() {
 		attachments = append(attachments, currentAttachment.FileName)
 	}
 	this.Data["attachments"] = attachments
-	threadRoot := findThreadRoot(m)
-	if threadRoot != "" {
-		this.Data["thread"] = removeCurrentLink(link, buildThread(threadRoot))
-	}
 }
 
 type AttachmentController struct {
 	web.Controller
 }
 
+func linkByMessageId(messageId string) string {
+	mailPathsLock.RLock()
+	path := mailPaths[messageId]
+	mailPathsLock.RUnlock()
+	return pathToLink(path)
+}
+
 func (this *AttachmentController) Get() {
 	folder := this.Ctx.Input.Param(":folder")
 	id := this.Ctx.Input.Param(":id")
-	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id) {
-		this.Abort("403")
-	}
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
 	file, err := os.Open(filepath.Join(mailDir, folder, id))
@@ -254,6 +258,10 @@ func (this *AttachmentController) Get() {
 	}()
 	m, err := enmime.ReadEnvelope(file)
 	check(err)
+	threadRoot := findThreadRoot(m)
+	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id, linkByMessageId(threadRoot)) {
+		this.Abort("403")
+	}
 	this.Ctx.Output.Header("Content-Disposition",
 		fmt.Sprintf("attachment; filename=\"%v\"", m.Attachments[index].FileName))
 	this.Ctx.Output.Header("Content-Type", m.Attachments[index].ContentType)

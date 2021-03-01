@@ -25,7 +25,7 @@ var (
 	backReferencesLock, childrenLock, mailPathsLock sync.RWMutex
 	mailDir                                         string
 	updates                                         chan update
-	isAllowed                                       func(string, string, string) bool
+	isAllowed                                       func(string, string, string, string) bool
 )
 
 func parseBackreferences(field string) (result map[string]bool) {
@@ -91,7 +91,7 @@ func init() {
 	permissionsPlugin, err := plugin.Open("permissions.so")
 	check(err)
 	f, err := permissionsPlugin.Lookup("IsAllowed")
-	isAllowed = f.(func(string, string, string) bool)
+	isAllowed = f.(func(string, string, string, string) bool)
 	check(err)
 }
 
