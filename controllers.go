@@ -8,7 +8,6 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
-	"log"
 	"mime"
 	"net/mail"
 	"os"
@@ -24,21 +23,21 @@ import (
 
 func check(e error) {
 	if e != nil {
-		log.Panic(e)
+		logger.Panic(e)
 	}
 }
 
 func getLogin(authHeader string) (login string) {
 	components := strings.Split(authHeader, " ")
 	if len(components) != 2 || components[0] != "Basic" {
-		log.Panic("Invalid Authorization header " + authHeader)
+		logger.Panic("Invalid Authorization header " + authHeader)
 	}
 	rawField, err := base64.StdEncoding.DecodeString(components[1])
 	check(err)
 	field := string(rawField)
 	components = strings.SplitN(field, ":", 2)
 	if len(components) != 2 {
-		log.Panic("Invalid Authorization login+password string: " + field)
+		logger.Panic("Invalid Authorization login+password string: " + field)
 	}
 	return components[0]
 }
@@ -129,7 +128,7 @@ func decodeRFC2047(header string) string {
 	if err == nil {
 		return result
 	} else {
-		log.Printf("RFC2047 decoding error:", err)
+		logger.Printf("RFC2047 decoding error:", err)
 		return header
 	}
 }

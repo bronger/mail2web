@@ -18,6 +18,7 @@ import (
 )
 
 var (
+	logger                                                          *log.Logger
 	includedDirs                                                    []string
 	onlyNumbersRegex                                                = regexp.MustCompile("^\\d+$")
 	referenceRegex                                                  = regexp.MustCompile("<([^>]+)")
@@ -62,12 +63,12 @@ func processMail(path string) (update update) {
 	}()
 	message, err := mail.ReadMessage(file)
 	if err != nil {
-		log.Println(err)
+		logger.Println(err)
 		return
 	}
 	match := referenceRegex.FindStringSubmatch(message.Header.Get("Message-ID"))
 	if len(match) < 2 {
-		log.Println(path, "has invalid Message-ID")
+		logger.Println(path, "has invalid Message-ID")
 		return
 	}
 	update.messageId = match[1]
@@ -79,7 +80,24 @@ func processMail(path string) (update update) {
 	return
 }
 
+// setupLogging sets up logging into a file.  The file is called
+// “mail2web.log”, and the directory is taken from the environment variable
+// M2W_LOG_PATH.  If this is not set, Go’s default logger ist used.
+func setupLogging() *log.Logger {
+	logPath := os.Getenv("M2W_LOG_PATH")
+	if logPath == "" {
+		return log.Default()
+	}
+	logFilename := filepath.Join(logPath, "mail2web.log")
+	logfile, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Panic(err)
+	}
+	return log.New(logfile, "", log.Lshortfile|log.LstdFlags)
+}
+
 func init() {
+	logger = setupLogging()
 	mailDir = os.Getenv("MAILDIR")
 	if mailDir == "" {
 		mailDir = "/var/lib/mails"
@@ -192,7 +210,7 @@ func setUpWatcher() {
 			case event := <-watcher.Events:
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					if update := processMail(event.Name); update.messageId != "" {
-						log.Println("WATCHER: created file:", event.Name)
+						logger.Println("WATCHER: created file:", event.Name)
 						mailPathsLock.Lock()
 						mailPaths[update.messageId] = event.Name
 						mailPathsLock.Unlock()
@@ -213,7 +231,7 @@ func setUpWatcher() {
 						}
 						mailPathsLock.RUnlock()
 						if messageId != "" {
-							log.Println("WATCHER: deleted file:", event.Name)
+							logger.Println("WATCHER: deleted file:", event.Name)
 							mailPathsLock.Lock()
 							delete(mailPaths, messageId)
 							mailPathsLock.Unlock()
