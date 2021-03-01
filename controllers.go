@@ -107,8 +107,8 @@ func findThreadRoot(m *enmime.Envelope) (root string) {
 	return root
 }
 
-func pathToLink(path_ string) string {
-	prefix, id := filepath.Split(path_)
+func pathToLink(path string) string {
+	prefix, id := filepath.Split(path)
 	_, folder := filepath.Split(strings.TrimSuffix(prefix, "/"))
 	return folder + "/" + id
 }
