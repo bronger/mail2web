@@ -31,6 +31,9 @@ var (
 	isAllowed                                                       func(string, string, string, string) bool
 )
 
+// parseBackreferences returns the message IDs mentioned in the given field.
+// The field may be e.g. “Message-ID” or “References”.  The result does not
+// contain angle brackets.
 func parseBackreferences(field string) (result map[string]bool) {
 	result = make(map[string]bool)
 	match := referenceRegex.FindAllStringSubmatch(field, -1)
@@ -40,6 +43,11 @@ func parseBackreferences(field string) (result map[string]bool) {
 	return
 }
 
+// This struct is passed through the channel “updates” to a central goroutine
+// that processes the updates.  It represents one email.  “references” contains
+// the message IDs in the “References” header field.  “timestamp” contains the
+// date of the email.  If “delete” is true, only “messageId” is used and all
+// other fields may be left empty.
 type update struct {
 	delete     bool
 	messageId  string
@@ -47,10 +55,16 @@ type update struct {
 	timestamp  time.Time
 }
 
+// isEligibleMailPath returns whether the given path refers to a file that
+// mail2web should assume to be an RFC 5322 mail file.  It is simply a filename
+// that consists only of numbers.
 func isEligibleMailPath(path string) bool {
 	return onlyNumbersRegex.MatchString(filepath.Base(path))
 }
 
+// processMail reads the RFC 5322 mail file at the given path and returns a
+// corresponding “update” object, ready to be sent to the “updates” channel.
+// If anything goes wrong, an empty “update” is returned.
 func processMail(path string) (update update) {
 	if !isEligibleMailPath(path) {
 		return
@@ -110,6 +124,12 @@ func init() {
 	updates = make(chan update, 1000_000)
 }
 
+// processUpdates is a goroutine running for the whole run time of the program.
+// It reads from the channel “updates” and updates the global data structures
+// “backReferences”, “children”, “mailPaths”, and “timestamps” accordingly.
+// To keep those mappings consistent, sending to the “updates” channel should
+// be the only may to write to them.  Besides, the channel is faster for
+// serialisition than write locks.
 func processUpdates() {
 	for update := range updates {
 		if update.delete {
@@ -151,6 +171,9 @@ func processUpdates() {
 	}
 }
 
+// populateGlobalMaps walks once through all mail files and sends them to the
+// “updates” channel.  This routine runs once, at the very beginning of the
+// program, to take care of the initial population of the global maps.
 func populateGlobalMaps() {
 	paths := make(chan string)
 	var workersWaitGroup sync.WaitGroup
@@ -192,6 +215,8 @@ func populateGlobalMaps() {
 	workersWaitGroup.Wait()
 }
 
+// setUpWatcher starts a goroutine that watches for changes in the mail folders
+// and sends them to “updates” accordingly.
 func setUpWatcher() {
 	watcher, err := fsnotify.NewWatcher()
 	check(err)
