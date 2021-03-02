@@ -108,14 +108,6 @@ func init() {
 	mailPaths = make(map[string]string)
 	timestamps = make(map[string]time.Time)
 	updates = make(chan update, 1000_000)
-	go processUpdates()
-	setUpWatcher()
-	populateGlobalMaps()
-	permissionsPlugin, err := plugin.Open("permissions.so")
-	check(err)
-	f, err := permissionsPlugin.Lookup("IsAllowed")
-	isAllowed = f.(func(string, string, string, string) bool)
-	check(err)
 }
 
 func processUpdates() {
@@ -255,5 +247,14 @@ func setUpWatcher() {
 }
 
 func main() {
+	go processUpdates()
+	setUpWatcher()
+	populateGlobalMaps()
+	permissionsPlugin, err := plugin.Open("permissions.so")
+	check(err)
+	f, err := permissionsPlugin.Lookup("IsAllowed")
+	isAllowed = f.(func(string, string, string, string) bool)
+	check(err)
+
 	web.Run()
 }
