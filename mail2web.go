@@ -278,8 +278,8 @@ func main() {
 	permissionsPlugin, err := plugin.Open("permissions.so")
 	check(err)
 	f, err := permissionsPlugin.Lookup("IsAllowed")
-	isAllowed = f.(func(string, string, string, string) bool)
 	check(err)
+	isAllowed = f.(func(string, string, string, string) bool)
 
 	web.Run()
 }
