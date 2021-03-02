@@ -319,6 +319,9 @@ func (this *AttachmentController) Get() {
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
 	file, err := os.Open(filepath.Join(mailDir, folder, id))
+	if errors.Is(err, fs.ErrNotExist) {
+		this.Abort("404")
+	}
 	check(err)
 	defer func() {
 		err := file.Close()
