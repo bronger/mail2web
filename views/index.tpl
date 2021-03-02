@@ -44,7 +44,7 @@
 {{.html}}
 </div>
 {{else}}
-<pre>
+<pre style="white-space: pre-line">
 {{.text}}
 </pre>
 {{end}}
