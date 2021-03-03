@@ -245,46 +245,52 @@ func removeCurrentLink(link string, thread *threadNode) *threadNode {
 	return thread
 }
 
-type MainController struct {
-	web.Controller
-}
-
-// Controller for viewing a particular email.
-func (this *MainController) Get() {
-	folder := this.Ctx.Input.Param(":folder")
-	id := this.Ctx.Input.Param(":id")
-	this.TplName = "index.tpl"
-	this.Data["folder"] = folder
-	this.Data["id"] = id
-	link := folder + "/" + id
+func readMail(controller *web.Controller) (
+	folder, id, link string, message *enmime.Envelope, threadRoot string) {
+	folder = controller.Ctx.Input.Param(":folder")
+	id = controller.Ctx.Input.Param(":id")
+	link = folder + "/" + id
 	file, err := os.Open(filepath.Join(mailDir, link))
 	if errors.Is(err, fs.ErrNotExist) {
-		this.Abort("404")
+		controller.Abort("404")
 	}
 	check(err)
 	defer func() {
 		err := file.Close()
 		check(err)
 	}()
-	m, err := enmime.ReadEnvelope(file)
+	message, err = enmime.ReadEnvelope(file)
 	check(err)
-	threadRoot := findThreadRoot(m)
+	threadRoot = findThreadRoot(message)
+	if !isAllowed(getLogin(controller.Ctx.Input.Header("Authorization")), folder, id, linkOrMessageId(threadRoot)) {
+		controller.Abort("403")
+	}
+	return
+}
+
+type MainController struct {
+	web.Controller
+}
+
+// Controller for viewing a particular email.
+func (this *MainController) Get() {
+	folder, id, link, message, threadRoot := readMail(&this.Controller)
+	this.TplName = "index.tpl"
+	this.Data["folder"] = folder
+	this.Data["id"] = id
 	if threadRoot != "" {
 		this.Data["thread"] = removeCurrentLink(link, buildThread(threadRoot))
 	}
-	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id, linkOrMessageId(threadRoot)) {
-		this.Abort("403")
-	}
-	this.Data["from"] = m.GetHeader("From")
-	this.Data["subject"] = m.GetHeader("Subject")
-	this.Data["to"] = m.GetHeader("To")
-	this.Data["date"] = m.GetHeader("Date")
-	this.Data["text"] = m.Text
-	body, err := getBody(m.HTML)
+	this.Data["from"] = message.GetHeader("From")
+	this.Data["subject"] = message.GetHeader("Subject")
+	this.Data["to"] = message.GetHeader("To")
+	this.Data["date"] = message.GetHeader("Date")
+	this.Data["text"] = message.Text
+	body, err := getBody(message.HTML)
 	check(err)
 	this.Data["html"] = template.HTML(body)
 	attachments := make([]string, 0)
-	for _, currentAttachment := range m.Attachments {
+	for _, currentAttachment := range message.Attachments {
 		attachments = append(attachments, currentAttachment.FileName)
 	}
 	this.Data["attachments"] = attachments
@@ -314,29 +320,13 @@ func linkOrMessageId(messageId string) string {
 
 // Controller for downloading mail attachments.
 func (this *AttachmentController) Get() {
-	folder := this.Ctx.Input.Param(":folder")
-	id := this.Ctx.Input.Param(":id")
+	_, _, _, message, _ := readMail(&this.Controller)
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
-	file, err := os.Open(filepath.Join(mailDir, folder, id))
-	if errors.Is(err, fs.ErrNotExist) {
-		this.Abort("404")
-	}
-	check(err)
-	defer func() {
-		err := file.Close()
-		check(err)
-	}()
-	m, err := enmime.ReadEnvelope(file)
-	check(err)
-	threadRoot := findThreadRoot(m)
-	if !isAllowed(getLogin(this.Ctx.Input.Header("Authorization")), folder, id, linkOrMessageId(threadRoot)) {
-		this.Abort("403")
-	}
 	this.Ctx.Output.Header("Content-Disposition",
-		fmt.Sprintf("attachment; filename=\"%v\"", m.Attachments[index].FileName))
-	this.Ctx.Output.Header("Content-Type", m.Attachments[index].ContentType)
-	err = this.Ctx.Output.Body(m.Attachments[index].Content)
+		fmt.Sprintf("attachment; filename=\"%v\"", message.Attachments[index].FileName))
+	this.Ctx.Output.Header("Content-Type", message.Attachments[index].ContentType)
+	err = this.Ctx.Output.Body(message.Attachments[index].Content)
 	check(err)
 }
 
