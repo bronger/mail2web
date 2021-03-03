@@ -29,6 +29,7 @@ var (
 	mailDir                                                         string
 	updates                                                         chan update
 	isAllowed                                                       func(string, string, string, string) bool
+	getEmailAddress                                                 func(string) string
 )
 
 // parseBackreferences returns the message IDs mentioned in the given field.
@@ -280,6 +281,9 @@ func main() {
 	f, err := permissionsPlugin.Lookup("IsAllowed")
 	check(err)
 	isAllowed = f.(func(string, string, string, string) bool)
+	f, err = permissionsPlugin.Lookup("GetEmailAddress")
+	check(err)
+	getEmailAddress = f.(func(string) string)
 
 	web.Run()
 }
