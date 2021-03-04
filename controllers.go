@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"io/fs"
 	"mime"
 	"net/mail"
+	"net/smtp"
 	"os"
 	"path/filepath"
 	"sort"
@@ -327,6 +329,76 @@ func (this *AttachmentController) Get() {
 		fmt.Sprintf("attachment; filename=\"%v\"", message.Attachments[index].FileName))
 	this.Ctx.Output.Header("Content-Type", message.Attachments[index].ContentType)
 	err = this.Ctx.Output.Body(message.Attachments[index].Content)
+	check(err)
+}
+
+// filterHeaders reads the specified mail, removed headers that should not be
+// shared with external due to technical or privacy reasons, and returns the
+// result.  It panics whenever something wents wrong, as it assumes that the
+// basic checks (e.g. that the mail file exists) have been made already.
+func filterHeaders(folder, id string) []byte {
+	file, err := os.Open(filepath.Join(mailDir, folder, id))
+	check(err)
+	defer func() {
+		err := file.Close()
+		check(err)
+	}()
+	scanner := bufio.NewScanner(file)
+	lines := make([][]byte, 0)
+	const (
+		inHeader   = iota
+		inDeletion = iota
+		inBody     = iota
+	)
+	state := inHeader
+	for scanner.Scan() {
+		line := make([]byte, len(scanner.Bytes()))
+		copy(line, scanner.Bytes())
+		if state != inBody {
+			if len(line) == 0 {
+				state = inBody
+			} else {
+				if state == inHeader {
+					allLower := bytes.ToLower(line)
+					for _, header := range [...]string{"Gcc", "Received", "Sender", "Return-Path",
+						"X-Envelope-From", "Envelope-From", "Envelope-To", "Delivered-To",
+						"X-Gnus-Mail-Source", "X-From-Line", "Face", "X-Draft-From"} {
+						allLowerKey := strings.ToLower(header) + ":"
+						if bytes.HasPrefix(allLower, []byte(allLowerKey)) {
+							state = inDeletion
+							goto Ignore
+						}
+					}
+				} else {
+					if bytes.HasPrefix(line, []byte(" ")) {
+						goto Ignore
+					} else {
+						state = inHeader
+					}
+				}
+			}
+		}
+		lines = append(lines, line)
+	Ignore:
+	}
+	err = scanner.Err()
+	check(err)
+	return append(bytes.Join(lines, []byte("\r\n")), []byte("\r\n")...)
+}
+
+type SendController struct {
+	web.Controller
+}
+
+// Controller for getting the current email being sent to the logged-in person.
+func (this *SendController) Get() {
+	folder, id, _, _, _ := readMail(&this.Controller)
+	loginName := getLogin(this.Ctx.Input.Header("Authorization"))
+	mailBody := filterHeaders(folder, id)
+	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
+		[]string{getEmailAddress(loginName)}, mailBody)
+	check(err)
+	err = this.Ctx.Output.Body([]byte{})
 	check(err)
 }
 

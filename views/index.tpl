@@ -4,6 +4,9 @@
 </head>
 <body>
 <h1>Mail {{.folder}}/{{.id}}</h1>
+
+<button onclick='var xhr = new XMLHttpRequest(); xhr.open("GET", "../{{.folder}}/{{.id}}/send"); xhr.send(null)'
+        >Send this to me!</button>
 {{if .thread}}
 <h2>Thread</h2>
 <ul>
