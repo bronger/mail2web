@@ -406,6 +406,19 @@ func (this *SendController) Get() {
 	check(err)
 }
 
+type MessageIdController struct {
+	web.Controller
+}
+
+// Controller for getting an emails by its message ID
+func (this *MessageIdController) Get() {
+	link := pathToLink(mailPaths[this.Ctx.Input.Param(":messageid")])
+	if link == "" {
+		this.Abort("404")
+	}
+	this.Redirect("/"+link, 303)
+}
+
 type HealthController struct {
 	web.Controller
 }
