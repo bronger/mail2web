@@ -394,9 +394,13 @@ type SendController struct {
 func (this *SendController) Get() {
 	folder, id, _, _, _ := readMail(&this.Controller)
 	loginName := getLogin(this.Ctx.Input.Header("Authorization"))
+	emailAddress := getEmailAddress(loginName)
+	if emailAddress == "" {
+		logger.Panicf("email address of %v not found", loginName)
+	}
 	mailBody := filterHeaders(folder, id)
 	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
-		[]string{getEmailAddress(loginName)}, mailBody)
+		[]string{emailAddress}, mailBody)
 	check(err)
 	err = this.Ctx.Output.Body([]byte{})
 	check(err)
