@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
@@ -84,9 +83,9 @@ func isAllowed(loginName, folder, id string, threadRoot string) (allowed bool) {
 		}
 	}
 	if allowed {
-		log.Print(fmt.Sprintf("granted %v access to %v/%v", loginName, folder, id))
+		logger.Println(fmt.Sprintf("granted %v access to %v/%v", loginName, folder, id))
 	} else {
-		log.Print(fmt.Sprintf("denied %v access to %v/%v", loginName, folder, id))
+		logger.Println(fmt.Sprintf("denied %v access to %v/%v", loginName, folder, id))
 	}
 	return allowed
 }
