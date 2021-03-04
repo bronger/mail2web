@@ -168,11 +168,9 @@ func threadNodeByMessageId(messageId string) *threadNode {
 	mailPathsLock.RUnlock()
 	if path == "" {
 		return &threadNode{
-			messageId,
-			"unknown",
-			"unknown (Message-ID: <" + messageId + ">)",
-			"",
-			make([]*threadNode, 0),
+			MessageId: messageId,
+			From:      "unknown",
+			Subject:   "unknown (Message-ID: <" + messageId + ">)",
 		}
 	}
 	file, err := os.Open(path)
@@ -195,7 +193,7 @@ func threadNodeByMessageId(messageId string) *threadNode {
 		from,
 		subject,
 		pathToLink(path),
-		make([]*threadNode, 0),
+		nil,
 	}
 }
 
@@ -291,7 +289,7 @@ func (this *MainController) Get() {
 	body, err := getBody(message.HTML)
 	check(err)
 	this.Data["html"] = template.HTML(body)
-	attachments := make([]string, 0)
+	var attachments []string
 	for _, currentAttachment := range message.Attachments {
 		attachments = append(attachments, currentAttachment.FileName)
 	}
@@ -344,7 +342,7 @@ func filterHeaders(folder, id string) []byte {
 		check(err)
 	}()
 	scanner := bufio.NewScanner(file)
-	lines := make([][]byte, 0)
+	var lines [][]byte
 	const (
 		inHeader   = iota
 		inDeletion = iota
