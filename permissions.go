@@ -9,7 +9,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var permissionsPath string
+var (
+	permissionsPath string
+	secretKey       []byte
+)
 
 var permissions struct {
 	Admin     string
@@ -92,6 +95,9 @@ func isAllowed(loginName, folder, id string, threadRoot string) (allowed bool) {
 
 func init() {
 	permissionsPath = filepath.Join(mailDir, "permissions.yaml")
+	var err error
+	secretKey, err = ioutil.ReadFile("/var/lib/mail2web_secrets/secret_key")
+	check(err)
 	readPermissions()
 	setUpPermissionsWatcher()
 }
