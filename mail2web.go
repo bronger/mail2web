@@ -21,34 +21,48 @@ var (
 	includedDirs                                                    []string
 	onlyNumbersRegex                                                = regexp.MustCompile("^\\d+$")
 	referenceRegex                                                  = regexp.MustCompile("<([^>]+)")
+	hashIds                                                         map[string]string
 	backReferences, children                                        map[string]map[string]bool
 	mailPaths                                                       map[string]string
 	timestamps                                                      map[string]time.Time
+	hashIdsLock                                                     sync.RWMutex
 	backReferencesLock, childrenLock, mailPathsLock, timestampsLock sync.RWMutex
 	mailDir                                                         string
 	updates                                                         chan update
 )
 
-// parseBackreferences returns the message IDs mentioned in the given field.
-// The field may be e.g. “Message-ID” or “References”.  The result does not
-// contain angle brackets.
+func messageIdToHashId(messageId string) (hashId string) {
+	hashIdsLock.RLock()
+	hashId, ok := hashIds[messageId]
+	hashIdsLock.RUnlock()
+	if !ok {
+		hashId = hashMessageId(messageId)
+		hashIdsLock.Lock()
+		hashIds[messageId] = hashId
+		hashIdsLock.Unlock()
+	}
+	return hashId
+}
+
+// parseBackreferences returns the hash IDs mentioned in the given field.  The
+// field may be e.g. “Message-ID” or “References”.
 func parseBackreferences(field string) (result map[string]bool) {
 	result = make(map[string]bool)
 	match := referenceRegex.FindAllStringSubmatch(field, -1)
 	for _, reference := range match {
-		result[reference[1]] = true
+		result[messageIdToHashId(reference[1])] = true
 	}
 	return
 }
 
 // This struct is passed through the channel “updates” to a central goroutine
 // that processes the updates.  It represents one email.  “references” contains
-// the message IDs in the “References” header field.  “timestamp” contains the
-// date of the email.  If “delete” is true, only “messageId” is used and all
-// other fields may be left empty.
+// the hash IDs in the “References” header field.  “timestamp” contains the
+// date of the email.  If “delete” is true, only “hashId” is used and all other
+// fields may be left empty.
 type update struct {
 	delete     bool
-	messageId  string
+	hashId     string
 	references map[string]bool
 	timestamp  time.Time
 }
@@ -83,7 +97,7 @@ func processMail(path string) (update update) {
 		logger.Println(path, "has invalid Message-ID")
 		return
 	}
-	update.messageId = match[1]
+	update.hashId = messageIdToHashId(match[1])
 	update.timestamp, _ = mail.ParseDate(message.Header.Get("Date"))
 	raw_references := message.Header.Get("References")
 	if raw_references != "" {
@@ -115,6 +129,7 @@ func init() {
 		mailDir = "/var/lib/mails"
 	}
 	includedDirs = strings.Split(os.Getenv("MAIL_FOLDERS"), ",")
+	hashIds = make(map[string]string)
 	backReferences = make(map[string]map[string]bool)
 	children = make(map[string]map[string]bool)
 	mailPaths = make(map[string]string)
@@ -132,24 +147,24 @@ func processUpdates() {
 	for update := range updates {
 		if update.delete {
 			backReferencesLock.RLock()
-			formerBackReferences, ok := backReferences[update.messageId]
+			formerBackReferences, ok := backReferences[update.hashId]
 			backReferencesLock.RUnlock()
 			if ok {
 				backReferencesLock.Lock()
-				delete(backReferences, update.messageId)
+				delete(backReferences, update.hashId)
 				backReferencesLock.Unlock()
 				childrenLock.Lock()
 				for ancestor, _ := range formerBackReferences {
-					delete(children[ancestor], update.messageId)
+					delete(children[ancestor], update.hashId)
 				}
 				childrenLock.Unlock()
 			}
 			timestampsLock.Lock()
-			delete(timestamps, update.messageId)
+			delete(timestamps, update.hashId)
 			timestampsLock.Unlock()
 		} else {
 			backReferencesLock.Lock()
-			backReferences[update.messageId] = update.references
+			backReferences[update.hashId] = update.references
 			backReferencesLock.Unlock()
 			for reference, _ := range update.references {
 				childrenLock.RLock()
@@ -159,11 +174,11 @@ func processUpdates() {
 				if !ok {
 					children[reference] = make(map[string]bool)
 				}
-				children[reference][update.messageId] = true
+				children[reference][update.hashId] = true
 				childrenLock.Unlock()
 			}
 			timestampsLock.Lock()
-			timestamps[update.messageId] = update.timestamp
+			timestamps[update.hashId] = update.timestamp
 			timestampsLock.Unlock()
 		}
 	}
@@ -179,9 +194,9 @@ func populateGlobalMaps() {
 		workersWaitGroup.Add(1)
 		go func() {
 			for path := range paths {
-				if update := processMail(path); update.messageId != "" {
+				if update := processMail(path); update.hashId != "" {
 					mailPathsLock.Lock()
-					mailPaths[update.messageId] = path
+					mailPaths[update.hashId] = path
 					mailPathsLock.Unlock()
 					if len(update.references) > 0 {
 						updates <- update
@@ -224,10 +239,10 @@ func setUpWatcher() {
 			select {
 			case event := <-watcher.Events:
 				if event.Op&fsnotify.Create == fsnotify.Create {
-					if update := processMail(event.Name); update.messageId != "" {
+					if update := processMail(event.Name); update.hashId != "" {
 						logger.Println("WATCHER: created file:", event.Name)
 						mailPathsLock.Lock()
-						mailPaths[update.messageId] = event.Name
+						mailPaths[update.hashId] = event.Name
 						mailPathsLock.Unlock()
 						if len(update.references) > 0 {
 							updates <- update
@@ -236,23 +251,23 @@ func setUpWatcher() {
 				} else if event.Op&fsnotify.Remove == fsnotify.Remove ||
 					event.Op&fsnotify.Rename == fsnotify.Rename {
 					if isEligibleMailPath(event.Name) {
-						var messageId string
+						var hashId string
 						mailPathsLock.RLock()
 						for currentMessageId, path := range mailPaths {
 							if path == event.Name {
-								messageId = currentMessageId
+								hashId = currentMessageId
 								break
 							}
 						}
 						mailPathsLock.RUnlock()
-						if messageId != "" {
+						if hashId != "" {
 							logger.Println("WATCHER: deleted file:", event.Name)
 							mailPathsLock.Lock()
-							delete(mailPaths, messageId)
+							delete(mailPaths, hashId)
 							mailPathsLock.Unlock()
 							updates <- update{
-								delete:    true,
-								messageId: messageId}
+								delete: true,
+								hashId: hashId}
 						}
 					}
 				}

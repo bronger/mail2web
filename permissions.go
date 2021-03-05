@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
@@ -93,11 +97,23 @@ func isAllowed(loginName, folder, id string, threadRoot string) (allowed bool) {
 	return allowed
 }
 
+func hashMessageId(messageId string) string {
+	hasher := sha256.New()
+	hasher.Write(secretKey)
+	hasher.Write([]byte(messageId))
+	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))[:10]
+}
+
 func init() {
 	permissionsPath = filepath.Join(mailDir, "permissions.yaml")
 	var err error
-	secretKey, err = ioutil.ReadFile("/var/lib/mail2web_secrets/secret_key")
+	secretKeyPath := os.Getenv("SECRET_KEY_PATH")
+	if secretKeyPath == "" {
+		secretKeyPath = "/var/lib/mail2web_secrets/secret_key"
+	}
+	secretKey, err = ioutil.ReadFile(secretKeyPath)
 	check(err)
+	secretKey = bytes.Trim(secretKey, "\t\n\r\f\v ")
 	readPermissions()
 	setUpPermissionsWatcher()
 }

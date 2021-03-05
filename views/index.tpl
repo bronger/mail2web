@@ -1,18 +1,18 @@
 <html>
 <head>
-<title>Mail {{.folder}}/{{.id}}</title>
+<title>Mail {{.hash}}</title>
 </head>
 <body>
-<h1>Mail {{.folder}}/{{.id}}</h1>
+<h1>Mail {{.hash}}</h1>
 
-<button onclick='var xhr = new XMLHttpRequest(); xhr.open("GET", "../{{.folder}}/{{.id}}/send"); xhr.send(null)'
+<button onclick='var xhr = new XMLHttpRequest(); xhr.open("GET", "{{.hash}}/send"); xhr.send(null)'
         >Send this to me!</button>
 {{if .thread}}
 <h2>Thread</h2>
 <ul>
   <li>
-    {{if $.thread.Link}}
-    <a href="../{{$.thread.Link}}"><strong>{{$.thread.From}}:</strong> {{$.thread.Subject}}</a>
+    {{if $.thread.HashId}}
+    <a href="{{$.thread.HashId}}"><strong>{{$.thread.From}}:</strong> {{$.thread.Subject}}</a>
     {{else}}
     <strong>{{$.thread.From}}:</strong> {{$.thread.Subject}}
     {{end}}
@@ -53,7 +53,7 @@
 {{end}}
 <h2>Attachments</h2>
 {{range $i, $name := .attachments}}
-<p><a href="{{$.id}}/{{$i}}">{{$name}}</a></p>
+<p><a href="{{$.hash}}/{{$i}}">{{$name}}</a></p>
 {{end}}
 </body>
 </html>
