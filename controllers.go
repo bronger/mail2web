@@ -311,9 +311,9 @@ func filterHeaders(hashId string) []byte {
 	scanner := bufio.NewScanner(file)
 	var lines [][]byte
 	const (
-		inHeader   = iota
-		inDeletion = iota
-		inBody     = iota
+		inHeader = iota
+		inDeletion
+		inBody
 	)
 	state := inHeader
 	for scanner.Scan() {
