@@ -5,8 +5,7 @@
 <body>
 <h1>Mail {{.hash}}</h1>
 
-<button onclick='var xhr = new XMLHttpRequest(); xhr.open("GET", "{{.hash}}/send"); xhr.send(null)'
-        >Send this to me!</button>
+<p><a href="restricted/{{.hash}}/send">Send this to me!</a></p>
 {{if .thread}}
 <h2>Thread</h2>
 <ul>

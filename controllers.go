@@ -367,8 +367,9 @@ func (this *SendController) Get() {
 	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
 		[]string{emailAddress}, mailBody)
 	check(err)
-	err = this.Ctx.Output.Body([]byte{})
-	check(err)
+	this.Data["hash"] = hashId
+	this.Data["address"] = emailAddress
+	this.TplName = "sent.tpl"
 }
 
 type MessageIdController struct {

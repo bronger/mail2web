@@ -7,7 +7,7 @@ import (
 func init() {
 	web.Router("/:hash", &MainController{})
 	web.Router("/:hash/:index:int", &AttachmentController{})
-	web.Router("/:hash/send", &SendController{})
-	web.Router("/message_ids/:messageid", &MessageIdController{})
+	web.Router("/restricted/:hash/send", &SendController{})
+	web.Router("/restricted/my_mails", &MyMailsController{})
 	web.Router("/healthz", &HealthController{})
 }
