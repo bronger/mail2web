@@ -20,7 +20,7 @@ var (
 
 var permissions struct {
 	Admin     string
-	Addresses map[string]string
+	Addresses map[string][]string
 	Groups    map[string]struct {
 		Members, Threads, Mails map[string]bool
 	}
@@ -73,6 +73,15 @@ func setUpPermissionsWatcher() {
 // getEmailAddress returns the email address of the given user.  If it is not
 // found in permissions.yaml, the result is empty.
 func getEmailAddress(loginName string) string {
+	addresses := permissions.Addresses[loginName]
+	if len(addresses) == 0 {
+		return ""
+	} else {
+		return addresses[0]
+	}
+}
+
+func getEmailAddresses(loginName string) []string {
 	return permissions.Addresses[loginName]
 }
 
