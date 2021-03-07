@@ -372,19 +372,18 @@ func (this *SendController) Get() {
 	this.TplName = "sent.tpl"
 }
 
-type MessageIdController struct {
+type MyMailsController struct {
 	web.Controller
 }
 
-// Controller for getting an emails by its message ID
-func (this *MessageIdController) Get() {
-	hashIdsLock.RLock()
-	hashId, ok := hashIds[this.Ctx.Input.Param(":messageid")]
-	hashIdsLock.RUnlock()
-	if !ok {
-		this.Abort("404")
+// Controller for searching for mail by message ID/getting an emails by its message ID
+func (this *MyMailsController) Get() {
+	loginName := getLogin(this.Ctx.Input.Header("Authorization"))
+	emailAddress := getEmailAddress(loginName)
+	if emailAddress == "" {
+		logger.Panicf("email address of %v not found", loginName)
 	}
-	this.Redirect("/"+hashId, 303)
+	// BUG(bronger): Real output missing
 }
 
 type HealthController struct {
