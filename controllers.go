@@ -139,7 +139,7 @@ func decodeRFC2047(header string) string {
 	if err == nil {
 		return result
 	} else {
-		logger.Printf("RFC2047 decoding error:", err)
+		logger.Println("RFC2047 decoding error:", err)
 		return header
 	}
 }
