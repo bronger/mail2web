@@ -59,8 +59,8 @@ func parseBackreferences(field string) (result map[string]bool) {
 }
 
 type mailInfo struct {
-	hashId     string
-	timestamp  time.Time
+	HashId     string
+	Timestamp  time.Time
 	references map[string]bool
 }
 
@@ -117,8 +117,8 @@ func processMail(path string) (update update) {
 		logger.Println(path, "has invalid Message-ID")
 		return
 	}
-	update.hashId = messageIdToHashId(match[1])
-	update.timestamp, _ = mail.ParseDate(message.Header.Get("Date"))
+	update.HashId = messageIdToHashId(match[1])
+	update.Timestamp, _ = mail.ParseDate(message.Header.Get("Date"))
 	raw_references := message.Header.Get("References")
 	if raw_references != "" {
 		update.references = parseBackreferences(raw_references)
@@ -172,24 +172,24 @@ func processUpdates() {
 	for update := range updates {
 		if update.delete {
 			backReferencesLock.RLock()
-			formerBackReferences, ok := backReferences[update.hashId]
+			formerBackReferences, ok := backReferences[update.HashId]
 			backReferencesLock.RUnlock()
 			if ok {
 				backReferencesLock.Lock()
-				delete(backReferences, update.hashId)
+				delete(backReferences, update.HashId)
 				backReferencesLock.Unlock()
 				childrenLock.Lock()
 				for ancestor, _ := range formerBackReferences {
-					delete(children[ancestor], update.hashId)
+					delete(children[ancestor], update.HashId)
 				}
 				childrenLock.Unlock()
 			}
 			timestampsLock.Lock()
-			delete(timestamps, update.hashId)
+			delete(timestamps, update.HashId)
 			timestampsLock.Unlock()
 		} else {
 			backReferencesLock.Lock()
-			backReferences[update.hashId] = update.references
+			backReferences[update.HashId] = update.references
 			backReferencesLock.Unlock()
 			for reference, _ := range update.references {
 				childrenLock.RLock()
@@ -199,11 +199,11 @@ func processUpdates() {
 				if !ok {
 					children[reference] = make(map[string]bool)
 				}
-				children[reference][update.hashId] = true
+				children[reference][update.HashId] = true
 				childrenLock.Unlock()
 			}
 			timestampsLock.Lock()
-			timestamps[update.hashId] = update.timestamp
+			timestamps[update.HashId] = update.Timestamp
 			timestampsLock.Unlock()
 		}
 	}
@@ -219,16 +219,16 @@ func populateGlobalMaps() {
 		workersWaitGroup.Add(1)
 		go func() {
 			for path := range paths {
-				if update := processMail(path); update.hashId != "" {
+				if update := processMail(path); update.HashId != "" {
 					mailPathsLock.Lock()
-					mailPaths[update.hashId] = path
+					mailPaths[update.HashId] = path
 					mailPathsLock.Unlock()
 					mailsByAddressLock.Lock()
 					for address, _ := range update.getAddresses() {
 						if mailsByAddress[address] == nil {
 							mailsByAddress[address] = make(map[string]mailInfo)
 						}
-						mailsByAddress[address][update.hashId] = update.mailInfo
+						mailsByAddress[address][update.HashId] = update.mailInfo
 					}
 					mailsByAddressLock.Unlock()
 					if len(update.references) > 0 {
@@ -272,17 +272,17 @@ func setUpWatcher() {
 			select {
 			case event := <-watcher.Events:
 				if event.Op&fsnotify.Create == fsnotify.Create {
-					if update := processMail(event.Name); update.hashId != "" {
+					if update := processMail(event.Name); update.HashId != "" {
 						logger.Println("WATCHER: created file:", event.Name)
 						mailPathsLock.Lock()
-						mailPaths[update.hashId] = event.Name
+						mailPaths[update.HashId] = event.Name
 						mailPathsLock.Unlock()
 						mailsByAddressLock.Lock()
 						for address, _ := range update.getAddresses() {
 							if mailsByAddress[address] == nil {
 								mailsByAddress[address] = make(map[string]mailInfo)
 							}
-							mailsByAddress[address][update.hashId] = update.mailInfo
+							mailsByAddress[address][update.HashId] = update.mailInfo
 						}
 						mailsByAddressLock.Unlock()
 						if len(update.references) > 0 {
@@ -308,7 +308,7 @@ func setUpWatcher() {
 							mailPathsLock.Unlock()
 							updates <- update{
 								delete:   true,
-								mailInfo: mailInfo{hashId: hashId}}
+								mailInfo: mailInfo{HashId: hashId}}
 						}
 						mailsByAddressLock.Lock()
 						for _, mails := range mailsByAddress {
