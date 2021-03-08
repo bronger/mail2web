@@ -17,15 +17,18 @@ import (
 )
 
 var (
-	logger                                                          *log.Logger
-	includedDirs                                                    []string
-	onlyNumbersRegex                                                = regexp.MustCompile("^\\d+$")
-	referenceRegex                                                  = regexp.MustCompile("<([^>]+)")
+	logger           *log.Logger
+	includedDirs     []string
+	onlyNumbersRegex = regexp.MustCompile("^\\d+$")
+	referenceRegex   = regexp.MustCompile("<([^>]+)")
+	emailRegex       = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}" +
+		"[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 	hashIds                                                         map[string]string
 	backReferences, children                                        map[string]map[string]bool
 	mailPaths                                                       map[string]string
 	timestamps                                                      map[string]time.Time
-	hashIdsLock                                                     sync.RWMutex
+	mailsByAddress                                                  map[string]map[string]mailInfo
+	hashIdsLock, mailsByAddressLock                                 sync.RWMutex
 	backReferencesLock, childrenLock, mailPathsLock, timestampsLock sync.RWMutex
 	mailDir                                                         string
 	updates                                                         chan update
@@ -55,16 +58,33 @@ func parseBackreferences(field string) (result map[string]bool) {
 	return
 }
 
+type mailInfo struct {
+	hashId     string
+	timestamp  time.Time
+	references map[string]bool
+}
+
 // This struct is passed through the channel “updates” to a central goroutine
 // that processes the updates.  It represents one email.  “references” contains
 // the hash IDs in the “References” header field.  “timestamp” contains the
 // date of the email.  If “delete” is true, only “hashId” is used and all other
 // fields may be left empty.
 type update struct {
-	delete     bool
-	hashId     string
-	references map[string]bool
-	timestamp  time.Time
+	delete                        bool
+	rawFrom, rawTo, rawCc, rawBcc string
+	mailInfo
+}
+
+func (update update) getAddresses() (addresses map[string]bool) {
+	matches := emailRegex.FindAllStringSubmatch(update.rawFrom, -1)
+	matches = append(matches, emailRegex.FindAllStringSubmatch(update.rawTo, -1)...)
+	matches = append(matches, emailRegex.FindAllStringSubmatch(update.rawCc, -1)...)
+	matches = append(matches, emailRegex.FindAllStringSubmatch(update.rawBcc, -1)...)
+	addresses = make(map[string]bool)
+	for _, match := range matches {
+		addresses[match[0]] = true
+	}
+	return addresses
 }
 
 // isEligibleMailPath returns whether the given path refers to a file that
@@ -103,6 +123,10 @@ func processMail(path string) (update update) {
 	if raw_references != "" {
 		update.references = parseBackreferences(raw_references)
 	}
+	update.rawFrom = message.Header.Get("From")
+	update.rawTo = message.Header.Get("To")
+	update.rawCc = message.Header.Get("Cc")
+	update.rawBcc = message.Header.Get("Bcc")
 	return
 }
 
@@ -133,6 +157,7 @@ func init() {
 	backReferences = make(map[string]map[string]bool)
 	children = make(map[string]map[string]bool)
 	mailPaths = make(map[string]string)
+	mailsByAddress = make(map[string]map[string]mailInfo)
 	timestamps = make(map[string]time.Time)
 	updates = make(chan update, 1000_000)
 }
@@ -198,6 +223,14 @@ func populateGlobalMaps() {
 					mailPathsLock.Lock()
 					mailPaths[update.hashId] = path
 					mailPathsLock.Unlock()
+					mailsByAddressLock.Lock()
+					for address, _ := range update.getAddresses() {
+						if mailsByAddress[address] == nil {
+							mailsByAddress[address] = make(map[string]mailInfo)
+						}
+						mailsByAddress[address][update.hashId] = update.mailInfo
+					}
+					mailsByAddressLock.Unlock()
 					if len(update.references) > 0 {
 						updates <- update
 					}
@@ -244,6 +277,14 @@ func setUpWatcher() {
 						mailPathsLock.Lock()
 						mailPaths[update.hashId] = event.Name
 						mailPathsLock.Unlock()
+						mailsByAddressLock.Lock()
+						for address, _ := range update.getAddresses() {
+							if mailsByAddress[address] == nil {
+								mailsByAddress[address] = make(map[string]mailInfo)
+							}
+							mailsByAddress[address][update.hashId] = update.mailInfo
+						}
+						mailsByAddressLock.Unlock()
 						if len(update.references) > 0 {
 							updates <- update
 						}
@@ -266,9 +307,14 @@ func setUpWatcher() {
 							delete(mailPaths, hashId)
 							mailPathsLock.Unlock()
 							updates <- update{
-								delete: true,
-								hashId: hashId}
+								delete:   true,
+								mailInfo: mailInfo{hashId: hashId}}
 						}
+						mailsByAddressLock.Lock()
+						for _, mails := range mailsByAddress {
+							delete(mails, hashId)
+						}
+						mailsByAddressLock.Unlock()
 					}
 				}
 			case err := <-watcher.Errors:
