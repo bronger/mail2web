@@ -384,7 +384,18 @@ func (this *MyMailsController) Get() {
 	if emailAddress == "" {
 		logger.Panicf("email address of %v not found", loginName)
 	}
-	// BUG(bronger): Real output missing
+	var rows []mailInfo
+	mailsByAddressLock.RLock()
+	for _, mailInfo := range mailsByAddress[emailAddress] {
+		rows = append(rows, mailInfo)
+	}
+	mailsByAddressLock.RUnlock()
+	logger.Println(len(rows))
+	sort.SliceStable(rows, func(i, j int) bool {
+		return rows[i].Timestamp.After(rows[j].Timestamp)
+	})
+	this.Data["rows"] = rows[:30]
+	this.TplName = "my_mails.tpl"
 }
 
 type HealthController struct {
