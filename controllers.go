@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/beego/beego/v2/server/web"
 	"github.com/jhillyerd/enmime"
@@ -394,7 +395,14 @@ func (this *MyMailsController) Get() {
 	sort.SliceStable(rows, func(i, j int) bool {
 		return rows[i].Timestamp.After(rows[j].Timestamp)
 	})
-	this.Data["rows"] = rows[:30]
+	limit := len(rows)
+	for i, mail := range rows {
+		if time.Since(mail.Timestamp) > thirtyDays {
+			limit = i
+			break
+		}
+	}
+	this.Data["rows"] = rows[:limit]
 	this.TplName = "my_mails.tpl"
 }
 

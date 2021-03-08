@@ -34,6 +34,8 @@ var (
 	updates                                                         chan update
 )
 
+const thirtyDays = time.Hour * 24 * 30
+
 func messageIdToHashId(messageId string) (hashId string) {
 	hashIdsLock.RLock()
 	hashId, ok := hashIds[messageId]
@@ -227,14 +229,16 @@ func populateGlobalMaps() {
 					mailPathsLock.Lock()
 					mailPaths[update.HashId] = path
 					mailPathsLock.Unlock()
-					mailsByAddressLock.Lock()
-					for address, _ := range update.getAddresses() {
-						if mailsByAddress[address] == nil {
-							mailsByAddress[address] = make(map[string]mailInfo)
+					if time.Since(update.Timestamp) <= thirtyDays {
+						mailsByAddressLock.Lock()
+						for address, _ := range update.getAddresses() {
+							if mailsByAddress[address] == nil {
+								mailsByAddress[address] = make(map[string]mailInfo)
+							}
+							mailsByAddress[address][update.HashId] = update.mailInfo
 						}
-						mailsByAddress[address][update.HashId] = update.mailInfo
+						mailsByAddressLock.Unlock()
 					}
-					mailsByAddressLock.Unlock()
 					if len(update.references) > 0 {
 						updates <- update
 					}
