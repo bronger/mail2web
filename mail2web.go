@@ -21,8 +21,8 @@ var (
 	includedDirs     []string
 	onlyNumbersRegex = regexp.MustCompile("^\\d+$")
 	referenceRegex   = regexp.MustCompile("<([^>]+)")
-	emailRegex       = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}" +
-		"[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+	emailRegex       = regexp.MustCompile("[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}" +
+		"[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*")
 	hashIds                                                         map[string]string
 	backReferences, children                                        map[string]map[string]bool
 	mailPaths                                                       map[string]string
