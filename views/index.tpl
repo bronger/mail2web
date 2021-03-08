@@ -7,6 +7,7 @@
 <h1>Mail {{.hash}}</h1>
 
 <p><a href="restricted/{{.hash}}/send">Send this to me!</a></p>
+<p><a href="restricted/my_mails">Show me my mails</a></p>
 {{if .thread}}
 <h2>Thread</h2>
 <ul>
