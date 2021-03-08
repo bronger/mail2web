@@ -85,7 +85,7 @@ func (update update) getAddresses() (addresses map[string]bool) {
 	matches = append(matches, emailRegex.FindAllStringSubmatch(update.rawBcc, -1)...)
 	addresses = make(map[string]bool)
 	for _, match := range matches {
-		addresses[match[0]] = true
+		addresses[strings.ToLower(match[0])] = true
 	}
 	return addresses
 }
