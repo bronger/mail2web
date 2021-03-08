@@ -59,9 +59,10 @@ func parseBackreferences(field string) (result map[string]bool) {
 }
 
 type mailInfo struct {
-	HashId     string
-	Timestamp  time.Time
-	references map[string]bool
+	HashId, MessageId string
+	From, Subject     string
+	Timestamp         time.Time
+	references        map[string]bool
 }
 
 // This struct is passed through the channel “updates” to a central goroutine
@@ -117,7 +118,8 @@ func processMail(path string) (update update) {
 		logger.Println(path, "has invalid Message-ID")
 		return
 	}
-	update.HashId = messageIdToHashId(match[1])
+	update.MessageId = match[1]
+	update.HashId = messageIdToHashId(update.MessageId)
 	update.Timestamp, _ = mail.ParseDate(message.Header.Get("Date"))
 	raw_references := message.Header.Get("References")
 	if raw_references != "" {
@@ -127,6 +129,8 @@ func processMail(path string) (update update) {
 	update.rawTo = message.Header.Get("To")
 	update.rawCc = message.Header.Get("Cc")
 	update.rawBcc = message.Header.Get("Bcc")
+	update.From = decodeRFC2047(update.rawFrom)
+	update.Subject = decodeRFC2047(message.Header.Get("Subject"))
 	return
 }
 
