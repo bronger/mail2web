@@ -1,4 +1,5 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <title>Your mails sent</title>
 </head>
@@ -6,8 +7,9 @@
 <h1>Your mails sent</h1>
 
 <p>All your mails of the last 30 days were sent to {{.address}} as a CSV file.</p>
-<p>This includes mails where the mail address(es) {{.addresses}} occur(s)
-  in “<tt>From:</tt>”, “<tt>To:</tt>”, “<tt>Cc:</tt>”, or “<tt>Bcc:</tt>”.</p>
+<p>This includes mails where the mail address(es) {{.addresses}} occur(s) in
+  “<samp>From:</samp>”, “<samp>To:</samp>”, “<samp>Cc:</samp>”, or
+  “<samp>Bcc:</samp>”.</p>
 
 <table>
   <thead>
