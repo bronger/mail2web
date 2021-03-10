@@ -220,8 +220,8 @@ func buildThread(root string) (rootNode *threadNode) {
 	return
 }
 
-// removeCurrentLink walks through a thread and removed the links (which is
-// identical to the hash ID sich this is the only elements in the URL path)
+// removeCurrentLink walks through a thread and removes the links (which is
+// identical to the hash ID since this is the only elements in the URL path)
 // from the node the hash ID of which matches the given one.  The reason is
 // that when displaying the thread in the browser, the current email should not
 // be hyperlinked.
