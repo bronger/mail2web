@@ -13,6 +13,7 @@ import (
 	"net/mail"
 	"net/smtp"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -254,6 +255,12 @@ func readMail(controller *web.Controller) (
 	return
 }
 
+func pathToLink(path string) string {
+	prefix, id := filepath.Split(path)
+	_, folder := filepath.Split(strings.TrimSuffix(prefix, "/"))
+	return folder + "/" + id
+}
+
 type MainController struct {
 	web.Controller
 }
@@ -271,6 +278,10 @@ func (this *MainController) Get() {
 	this.Data["to"] = message.GetHeader("To")
 	this.Data["date"] = message.GetHeader("Date")
 	this.Data["text"] = message.Text
+	mailPathsLock.RLock()
+	path := mailPaths[hashId]
+	mailPathsLock.RUnlock()
+	this.Data["link"] = pathToLink(path)
 	body, err := getBody(message.HTML)
 	check(err)
 	this.Data["html"] = template.HTML(body)

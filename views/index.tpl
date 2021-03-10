@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>Mail {{.hash}}</title>
+<title>Mail {{.link}}</title>
 </head>
 <body>
-<h1>Mail {{.hash}}</h1>
+<h1>Mail {{.link}}</h1>
 
 <p><a href="restricted/{{.hash}}/send">Send this to me!</a></p>
 <p><a href="restricted/my_mails">Show me my mails</a></p>
