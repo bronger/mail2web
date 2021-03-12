@@ -52,9 +52,11 @@
 {{.text}}
 </pre>
 {{end}}
+{{if .attachments}}
 <h2>Attachments</h2>
 {{range $i, $name := .attachments}}
 <p><a href="{{$.rooturl}}/{{$.hash}}/{{$i}}">{{$name}}</a></p>
+{{end}}
 {{end}}
 </body>
 </html>
