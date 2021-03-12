@@ -12,10 +12,10 @@
 <h2>Thread</h2>
 <ul>
   <li>
-    {{if $.thread.HashId}}
-    <a href="{{$.thread.RootURL}}/{{$.thread.HashId}}"><strong>{{$.thread.From}}:</strong> {{$.thread.Subject}}</a>
+    {{if .thread.HashId}}
+    <a href="{{.thread.RootURL}}/{{.thread.HashId}}"><strong>{{.thread.From}}:</strong> {{.thread.Subject}}</a>
     {{else}}
-    <strong>{{$.thread.From}}:</strong> {{$.thread.Subject}}
+    <strong>{{.thread.From}}:</strong> {{.thread.Subject}}
     {{end}}
   </li>
   <ul>
