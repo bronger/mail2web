@@ -30,7 +30,7 @@ var (
 	mailsByAddress                                                  map[string]map[string]mailInfo
 	hashIdsLock, mailsByAddressLock                                 sync.RWMutex
 	backReferencesLock, childrenLock, mailPathsLock, timestampsLock sync.RWMutex
-	mailDir                                                         string
+	mailDir, rootURL                                                string
 	updates                                                         chan update
 )
 
@@ -157,6 +157,10 @@ func init() {
 	mailDir = os.Getenv("MAILDIR")
 	if mailDir == "" {
 		mailDir = "/var/lib/mails"
+	}
+	rootURL := os.Getenv("ROOT_URL")
+	if rootURL != "" && !strings.HasPrefix(rootURL, "/") {
+		logger.Panic("ROOT_URL must be empty or start with a slash")
 	}
 	includedDirs = strings.Split(os.Getenv("MAIL_FOLDERS"), ",")
 	hashIds = make(map[string]string)

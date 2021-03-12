@@ -1,7 +1,7 @@
 {{range .Children}}
 <li>
   {{if .HashId}}
-  <a href="{{.HashId}}"><strong>{{.From}}:</strong> {{.Subject}}</a>
+  <a href="{{.RootURL}}/{{.HashId}}"><strong>{{.From}}:</strong> {{.Subject}}</a>
   {{else}}
   <strong>{{.From}}:</strong> {{.Subject}}
   {{end}}

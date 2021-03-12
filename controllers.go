@@ -130,6 +130,7 @@ func findThreadRoot(m *enmime.Envelope) (root string) {
 type threadNode struct {
 	HashId        string
 	From, Subject string
+	RootURL       string
 	Children      []*threadNode
 }
 
@@ -160,6 +161,7 @@ func threadNodeByHashId(hashId string) *threadNode {
 			HashId:  hashId,
 			From:    "unknown",
 			Subject: "unknown (Hash-ID: " + hashId + ")",
+			RootURL: rootURL,
 		}
 	}
 	file, err := os.Open(path)
@@ -181,6 +183,7 @@ func threadNodeByHashId(hashId string) *threadNode {
 		hashId,
 		from,
 		subject,
+		rootURL,
 		nil,
 	}
 }
@@ -270,6 +273,7 @@ func (this *MainController) Get() {
 	hashId, message, threadRoot := readMail(&this.Controller)
 	this.Data["hash"] = hashId
 	this.TplName = "index.tpl"
+	this.Data["rooturl"] = rootURL
 	if threadRoot != "" {
 		this.Data["thread"] = removeCurrentLink(hashId, buildThread(threadRoot))
 	}
@@ -383,6 +387,7 @@ func (this *SendController) Get() {
 	this.Data["hash"] = hashId
 	this.Data["address"] = emailAddress
 	this.TplName = "sent.tpl"
+	this.Data["rooturl"] = rootURL
 }
 
 type MyMailsController struct {
@@ -415,6 +420,7 @@ func (this *MyMailsController) Get() {
 	}
 	this.Data["rows"] = rows[:limit]
 	this.TplName = "my_mails.tpl"
+	this.Data["rooturl"] = rootURL
 }
 
 type HealthController struct {

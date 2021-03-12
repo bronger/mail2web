@@ -21,7 +21,7 @@
   </thead>
   <tbody>
     {{range .rows}}
-    <tr><td><a href="../{{.HashId}}">{{.Timestamp}}</a></td><td>{{.From}}</td><td>{{.Subject}}</td><td>{{.MessageId}}</td></tr>
+    <tr><td><a href="{{$.rooturl}}/{{.HashId}}">{{.Timestamp}}</a></td><td>{{.From}}</td><td>{{.Subject}}</td><td>{{.MessageId}}</td></tr>
     {{end}}
   </tbody>
 </table>

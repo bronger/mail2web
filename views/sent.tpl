@@ -6,6 +6,6 @@
 <body>
 <h1>Mail {{.hash}} sent</h1>
 
-<p>Mail <a href="../../{{.hash}}">{{.hash}}</a> was sent to {{.address}}.</p>
+<p>Mail <a href="{{.rooturl}}/{{.hash}}">{{.hash}}</a> was sent to {{.address}}.</p>
 </body>
 </html>
