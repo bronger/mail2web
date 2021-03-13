@@ -238,14 +238,10 @@ func removeCurrentLink(hashId string, thread *threadNode) *threadNode {
 	return thread
 }
 
-func readMail(controller *web.Controller) (
-	hashId string, message *enmime.Envelope, threadRoot string) {
-	hashId = controller.Ctx.Input.Param(":hash")
-	mailPathsLock.RLock()
-	file, err := os.Open(mailPaths[hashId])
-	mailPathsLock.RUnlock()
+func readMail(mailPath string) (message *enmime.Envelope, threadRoot string, err error) {
+	file, err := os.Open(mailPath)
 	if errors.Is(err, fs.ErrNotExist) {
-		controller.Abort("404")
+		return
 	}
 	check(err)
 	defer func() {
@@ -255,6 +251,18 @@ func readMail(controller *web.Controller) (
 	message, err = enmime.ReadEnvelope(file)
 	check(err)
 	threadRoot = findThreadRoot(message)
+	return
+}
+
+func readOriginMail(controller *web.Controller) (hashId string, message *enmime.Envelope, threadRoot string) {
+	hashId = controller.Ctx.Input.Param(":hash")
+	mailPathsLock.RLock()
+	mailPath := mailPaths[hashId]
+	mailPathsLock.RUnlock()
+	message, threadRoot, err := readMail(mailPath)
+	if err != nil {
+		controller.Abort("404")
+	}
 	return
 }
 
@@ -270,7 +278,7 @@ type MainController struct {
 
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
-	hashId, message, threadRoot := readMail(&this.Controller)
+	hashId, message, threadRoot := readOriginMail(&this.Controller)
 	this.Data["hash"] = hashId
 	this.TplName = "index.tpl"
 	this.Data["rooturl"] = rootURL
@@ -302,7 +310,7 @@ type AttachmentController struct {
 
 // Controller for downloading mail attachments.
 func (this *AttachmentController) Get() {
-	_, message, _ := readMail(&this.Controller)
+	_, message, _ := readOriginMail(&this.Controller)
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
 	this.Ctx.Output.Header("Content-Disposition",
