@@ -278,13 +278,22 @@ type MainController struct {
 
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
-	hashId, message, threadRoot := readOriginMail(&this.Controller)
+	messageID := this.Ctx.Input.Param(":messageID")
+	var (
+		hashId, threadRoot string
+		message            *enmime.Envelope
+	)
+	if messageID == "" {
+		hashId, message, threadRoot = readOriginMail(&this.Controller)
+	} else {
+		// TBD
+	}
 	this.Data["hash"] = hashId
-	this.TplName = "index.tpl"
-	this.Data["rooturl"] = rootURL
 	if threadRoot != "" {
 		this.Data["thread"] = removeCurrentLink(hashId, buildThread(threadRoot))
 	}
+	this.TplName = "index.tpl"
+	this.Data["rooturl"] = rootURL
 	this.Data["from"] = message.GetHeader("From")
 	this.Data["subject"] = message.GetHeader("Subject")
 	this.Data["to"] = message.GetHeader("To")
