@@ -94,16 +94,24 @@ func getBody(htmlDocument string) (string, error) {
 	return buffer.String(), nil
 }
 
+func extractMessageID(rawHeader string) string {
+	match := referenceRegex.FindStringSubmatch(rawHeader)
+	if len(match) < 2 {
+		return ""
+	}
+	return match[1]
+}
+
 // findThreadRoot returns the hash ID of the root element of the thread the
 // given mail appears in.  If there is no thread, the hash ID of the given mail
 // is returned.  It returns the empty string if that hash ID cannot be
 // extracted, or if the thread has a depth larger than 100.
 func findThreadRoot(m *enmime.Envelope) (root string) {
-	match := referenceRegex.FindStringSubmatch(m.GetHeader("Message-ID"))
-	if len(match) < 2 {
+	messageID := extractMessageID(m.GetHeader("Message-ID"))
+	if messageID == "" {
 		return ""
 	}
-	hashId := messageIdToHashId(match[1])
+	hashId := messageIdToHashId(messageID)
 	var stepBack func(string, int) (string, int)
 	stepBack = func(hashId string, depth int) (root string, rootDepth int) {
 		if depth > 100 {
@@ -128,9 +136,10 @@ func findThreadRoot(m *enmime.Envelope) (root string) {
 // threadNode represents one mail in a nested thread.  All members are
 // expotable because they are needed in the templates.
 type threadNode struct {
-	HashId        string
+	MessageID     string
 	From, Subject string
 	RootURL       string
+	OriginHashID  string
 	Children      []*threadNode
 }
 
@@ -158,7 +167,6 @@ func threadNodeByHashId(hashId string) *threadNode {
 	mailPathsLock.RUnlock()
 	if path == "" {
 		return &threadNode{
-			HashId:  hashId,
 			From:    "unknown",
 			Subject: "unknown (Hash-ID: " + hashId + ")",
 			RootURL: rootURL,
@@ -179,11 +187,13 @@ func threadNodeByHashId(hashId string) *threadNode {
 		from = "unknown"
 		subject = "unknown"
 	}
+	messageID := extractMessageID(message.Header.Get("Message-ID"))
 	return &threadNode{
-		hashId,
+		messageID,
 		from,
 		subject,
 		rootURL,
+		"",
 		nil,
 	}
 }
@@ -212,28 +222,36 @@ func buildThread(root string) (rootNode *threadNode) {
 		}
 		childNode := buildThread(child)
 		if childNode != nil {
+			// FixMe: Check that mail is not newer than origin
 			rootNode.Children = append(rootNode.Children, childNode)
 		}
 	}
-	timestampsLock.RLock()
 	sort.SliceStable(rootNode.Children, func(i, j int) bool {
-		return timestamps[rootNode.Children[i].HashId].Before(timestamps[rootNode.Children[j].HashId])
+		hashID_i := hashMessageId(rootNode.Children[i].MessageID)
+		hashID_j := hashMessageId(rootNode.Children[j].MessageID)
+		timestampsLock.RLock()
+		before := timestamps[hashID_i].Before(timestamps[hashID_j])
+		timestampsLock.RUnlock()
+		return before
 	})
-	timestampsLock.RUnlock()
 	return
 }
 
-// removeCurrentLink walks through a thread and removes the links (which is
+// finalizeThread walks through a thread and removes the links (which is
 // identical to the hash ID since this is the only elements in the URL path)
 // from the node the hash ID of which matches the given one.  The reason is
 // that when displaying the thread in the browser, the current email should not
 // be hyperlinked.
-func removeCurrentLink(hashId string, thread *threadNode) *threadNode {
-	if thread.HashId == hashId {
-		thread.HashId = ""
+func finalizeThread(messageID, originHashID string, thread *threadNode) *threadNode {
+	// FixMe: Replace "/" with "%2f"
+	if thread.MessageID == messageID {
+		thread.MessageID = ""
+		thread.OriginHashID = ""
+	} else {
+		thread.OriginHashID = originHashID
 	}
 	for _, child := range thread.Children {
-		removeCurrentLink(hashId, child)
+		finalizeThread(messageID, originHashID, child)
 	}
 	return thread
 }
@@ -278,19 +296,35 @@ type MainController struct {
 
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
-	messageID := this.Ctx.Input.Param(":messageID")
+	messageID := this.Ctx.Input.Param(":messageid")
 	var (
-		hashId, threadRoot string
-		message            *enmime.Envelope
+		hashId, threadRoot, originHashID string
+		message                          *enmime.Envelope
 	)
 	if messageID == "" {
 		hashId, message, threadRoot = readOriginMail(&this.Controller)
+		originHashID = hashId
+		messageID = extractMessageID(message.GetHeader("Message-ID"))
 	} else {
-		// TBD
+		var originThreadRoot string
+		originHashID, _, originThreadRoot = readOriginMail(&this.Controller)
+		hashId = hashMessageId(messageID)
+		mailPathsLock.RLock()
+		mailPath := mailPaths[hashId]
+		mailPathsLock.RUnlock()
+		var err error
+		message, threadRoot, err = readMail(mailPath)
+		if err != nil {
+			this.Abort("404")
+		}
+		if originThreadRoot != threadRoot {
+			this.Abort("403")
+		}
+		// FixMe: Check that mail is not newer than origin
 	}
 	this.Data["hash"] = hashId
 	if threadRoot != "" {
-		this.Data["thread"] = removeCurrentLink(hashId, buildThread(threadRoot))
+		this.Data["thread"] = finalizeThread(messageID, originHashID, buildThread(threadRoot))
 	}
 	this.TplName = "index.tpl"
 	this.Data["rooturl"] = rootURL
