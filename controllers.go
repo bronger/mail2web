@@ -201,7 +201,7 @@ func threadNodeByHashID(hashID hashID) *threadNode {
 
 // buildThread returns the thread to the given root hash ID as a nested
 // structure of threadNode’s.
-func buildThread(root hashID) (rootNode *threadNode) {
+func buildThread(root, originHashID hashID) (rootNode *threadNode) {
 	rootNode = threadNodeByHashID(root)
 	childrenLock.RLock()
 	root_children := children[root]
@@ -211,6 +211,12 @@ func buildThread(root hashID) (rootNode *threadNode) {
 		children[child] = true
 	}
 	for child, _ := range root_children {
+		timestampsLock.RLock()
+		after := timestamps[child].After(timestamps[originHashID])
+		timestampsLock.RUnlock()
+		if after {
+			continue
+		}
 		grandChild := false
 		for backReference, _ := range backReferences[child] {
 			if children[backReference] {
@@ -221,9 +227,8 @@ func buildThread(root hashID) (rootNode *threadNode) {
 		if grandChild {
 			continue
 		}
-		childNode := buildThread(child)
+		childNode := buildThread(child, originHashID)
 		if childNode != nil {
-			// FixMe: Check that mail is not newer than origin
 			rootNode.Children = append(rootNode.Children, childNode)
 		}
 	}
@@ -330,11 +335,16 @@ func (this *MainController) Get() {
 		if originThreadRoot != threadRoot {
 			this.Abort("403")
 		}
-		// FixMe: Check that mail is not newer than origin
+		timestampsLock.RLock()
+		after := timestamps[hashID].After(timestamps[originHashID])
+		timestampsLock.RUnlock()
+		if after {
+			this.Abort("403")
+		}
 		this.Data["link"] = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(messageID)))
 	}
 	if threadRoot != "" {
-		this.Data["thread"] = finalizeThread(messageID, originHashID, buildThread(threadRoot))
+		this.Data["thread"] = finalizeThread(messageID, originHashID, buildThread(threadRoot, originHashID))
 	}
 	this.TplName = "index.tpl"
 	this.Data["rooturl"] = rootURL
@@ -368,7 +378,7 @@ func (this *AttachmentController) Get() {
 	if messageID == "" {
 		_, message, _ = readOriginMail(&this.Controller)
 	} else {
-		_, _, originThreadRoot := readOriginMail(&this.Controller)
+		originHashID, _, originThreadRoot := readOriginMail(&this.Controller)
 		hashID := messageIDToHashID(messageID)
 		mailPathsLock.RLock()
 		mailPath := mailPaths[hashID]
@@ -384,7 +394,12 @@ func (this *AttachmentController) Get() {
 		if originThreadRoot != threadRoot {
 			this.Abort("403")
 		}
-		// FixMe: Check that mail is not newer than origin
+		timestampsLock.RLock()
+		after := timestamps[hashID].After(timestamps[originHashID])
+		timestampsLock.RUnlock()
+		if after {
+			this.Abort("403")
+		}
 	}
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
