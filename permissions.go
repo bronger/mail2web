@@ -106,10 +106,10 @@ func isAllowed(loginName, folder, id string, threadRoot string) (allowed bool) {
 	return allowed
 }
 
-func hashMessageId(messageId string) string {
+func hashMessageID(messageID string) string {
 	hasher := sha256.New()
 	hasher.Write(secretKey)
-	hasher.Write([]byte(messageId))
+	hasher.Write([]byte(messageID))
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))[:10]
 }
 

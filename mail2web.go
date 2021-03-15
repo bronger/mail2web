@@ -23,12 +23,12 @@ var (
 	referenceRegex   = regexp.MustCompile("<([^>]+)")
 	emailRegex       = regexp.MustCompile("[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}" +
 		"[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*")
-	hashIds                                                         map[string]string
+	hashIDs                                                         map[string]string
 	backReferences, children                                        map[string]map[string]bool
 	mailPaths                                                       map[string]string
 	timestamps                                                      map[string]time.Time
 	mailsByAddress                                                  map[string]map[string]mailInfo
-	hashIdsLock, mailsByAddressLock                                 sync.RWMutex
+	hashIDsLock, mailsByAddressLock                                 sync.RWMutex
 	backReferencesLock, childrenLock, mailPathsLock, timestampsLock sync.RWMutex
 	mailDir, rootURL                                                string
 	updates                                                         chan update
@@ -36,17 +36,17 @@ var (
 
 const thirtyDays = time.Hour * 24 * 30
 
-func messageIdToHashId(messageId string) (hashId string) {
-	hashIdsLock.RLock()
-	hashId, ok := hashIds[messageId]
-	hashIdsLock.RUnlock()
+func messageIDToHashID(messageID string) (hashID string) {
+	hashIDsLock.RLock()
+	hashID, ok := hashIDs[messageID]
+	hashIDsLock.RUnlock()
 	if !ok {
-		hashId = hashMessageId(messageId)
-		hashIdsLock.Lock()
-		hashIds[messageId] = hashId
-		hashIdsLock.Unlock()
+		hashID = hashMessageID(messageID)
+		hashIDsLock.Lock()
+		hashIDs[messageID] = hashID
+		hashIDsLock.Unlock()
 	}
-	return hashId
+	return hashID
 }
 
 // parseBackreferences returns the hash IDs mentioned in the given field.  The
@@ -55,13 +55,13 @@ func parseBackreferences(field string) (result map[string]bool) {
 	result = make(map[string]bool)
 	match := referenceRegex.FindAllStringSubmatch(field, -1)
 	for _, reference := range match {
-		result[messageIdToHashId(reference[1])] = true
+		result[messageIDToHashID(reference[1])] = true
 	}
 	return
 }
 
 type mailInfo struct {
-	HashId, MessageId string
+	HashID, MessageID string
 	From, Subject     string
 	Timestamp         time.Time
 	references        map[string]bool
@@ -70,7 +70,7 @@ type mailInfo struct {
 // This struct is passed through the channel “updates” to a central goroutine
 // that processes the updates.  It represents one email.  “references” contains
 // the hash IDs in the “References” header field.  “timestamp” contains the
-// date of the email.  If “delete” is true, only “hashId” is used and all other
+// date of the email.  If “delete” is true, only “hashID” is used and all other
 // fields may be left empty.
 type update struct {
 	delete                        bool
@@ -120,8 +120,8 @@ func processMail(path string) (update update) {
 		logger.Println(path, "has invalid Message-ID")
 		return
 	}
-	update.MessageId = match[1]
-	update.HashId = messageIdToHashId(update.MessageId)
+	update.MessageID = match[1]
+	update.HashID = messageIDToHashID(update.MessageID)
 	update.Timestamp, _ = mail.ParseDate(message.Header.Get("Date"))
 	raw_references := message.Header.Get("References")
 	if raw_references != "" {
@@ -163,7 +163,7 @@ func init() {
 		logger.Panic("ROOT_URL must be empty or start with a slash")
 	}
 	includedDirs = strings.Split(os.Getenv("MAIL_FOLDERS"), ",")
-	hashIds = make(map[string]string)
+	hashIDs = make(map[string]string)
 	backReferences = make(map[string]map[string]bool)
 	children = make(map[string]map[string]bool)
 	mailPaths = make(map[string]string)
@@ -182,24 +182,24 @@ func processUpdates() {
 	for update := range updates {
 		if update.delete {
 			backReferencesLock.RLock()
-			formerBackReferences, ok := backReferences[update.HashId]
+			formerBackReferences, ok := backReferences[update.HashID]
 			backReferencesLock.RUnlock()
 			if ok {
 				backReferencesLock.Lock()
-				delete(backReferences, update.HashId)
+				delete(backReferences, update.HashID)
 				backReferencesLock.Unlock()
 				childrenLock.Lock()
 				for ancestor, _ := range formerBackReferences {
-					delete(children[ancestor], update.HashId)
+					delete(children[ancestor], update.HashID)
 				}
 				childrenLock.Unlock()
 			}
 			timestampsLock.Lock()
-			delete(timestamps, update.HashId)
+			delete(timestamps, update.HashID)
 			timestampsLock.Unlock()
 		} else {
 			backReferencesLock.Lock()
-			backReferences[update.HashId] = update.references
+			backReferences[update.HashID] = update.references
 			backReferencesLock.Unlock()
 			for reference, _ := range update.references {
 				childrenLock.RLock()
@@ -209,11 +209,11 @@ func processUpdates() {
 				if !ok {
 					children[reference] = make(map[string]bool)
 				}
-				children[reference][update.HashId] = true
+				children[reference][update.HashID] = true
 				childrenLock.Unlock()
 			}
 			timestampsLock.Lock()
-			timestamps[update.HashId] = update.Timestamp
+			timestamps[update.HashID] = update.Timestamp
 			timestampsLock.Unlock()
 		}
 	}
@@ -229,9 +229,9 @@ func populateGlobalMaps() {
 		workersWaitGroup.Add(1)
 		go func() {
 			for path := range paths {
-				if update := processMail(path); update.HashId != "" {
+				if update := processMail(path); update.HashID != "" {
 					mailPathsLock.Lock()
-					mailPaths[update.HashId] = path
+					mailPaths[update.HashID] = path
 					mailPathsLock.Unlock()
 					if time.Since(update.Timestamp) <= thirtyDays {
 						mailsByAddressLock.Lock()
@@ -239,7 +239,7 @@ func populateGlobalMaps() {
 							if mailsByAddress[address] == nil {
 								mailsByAddress[address] = make(map[string]mailInfo)
 							}
-							mailsByAddress[address][update.HashId] = update.mailInfo
+							mailsByAddress[address][update.HashID] = update.mailInfo
 						}
 						mailsByAddressLock.Unlock()
 					}
@@ -284,17 +284,17 @@ func setUpWatcher() {
 			select {
 			case event := <-watcher.Events:
 				if event.Op&fsnotify.Create == fsnotify.Create {
-					if update := processMail(event.Name); update.HashId != "" {
+					if update := processMail(event.Name); update.HashID != "" {
 						logger.Println("WATCHER: created file:", event.Name)
 						mailPathsLock.Lock()
-						mailPaths[update.HashId] = event.Name
+						mailPaths[update.HashID] = event.Name
 						mailPathsLock.Unlock()
 						mailsByAddressLock.Lock()
 						for address, _ := range update.getAddresses() {
 							if mailsByAddress[address] == nil {
 								mailsByAddress[address] = make(map[string]mailInfo)
 							}
-							mailsByAddress[address][update.HashId] = update.mailInfo
+							mailsByAddress[address][update.HashID] = update.mailInfo
 						}
 						mailsByAddressLock.Unlock()
 						if len(update.references) > 0 {
@@ -304,27 +304,27 @@ func setUpWatcher() {
 				} else if event.Op&fsnotify.Remove == fsnotify.Remove ||
 					event.Op&fsnotify.Rename == fsnotify.Rename {
 					if isEligibleMailPath(event.Name) {
-						var hashId string
+						var hashID string
 						mailPathsLock.RLock()
-						for currentMessageId, path := range mailPaths {
+						for currentMessageID, path := range mailPaths {
 							if path == event.Name {
-								hashId = currentMessageId
+								hashID = currentMessageID
 								break
 							}
 						}
 						mailPathsLock.RUnlock()
-						if hashId != "" {
+						if hashID != "" {
 							logger.Println("WATCHER: deleted file:", event.Name)
 							mailPathsLock.Lock()
-							delete(mailPaths, hashId)
+							delete(mailPaths, hashID)
 							mailPathsLock.Unlock()
 							updates <- update{
 								delete:   true,
-								mailInfo: mailInfo{HashId: hashId}}
+								mailInfo: mailInfo{HashID: hashID}}
 						}
 						mailsByAddressLock.Lock()
 						for _, mails := range mailsByAddress {
-							delete(mails, hashId)
+							delete(mails, hashID)
 						}
 						mailsByAddressLock.Unlock()
 					}

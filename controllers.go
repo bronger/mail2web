@@ -111,15 +111,15 @@ func findThreadRoot(m *enmime.Envelope) (root string) {
 	if messageID == "" {
 		return ""
 	}
-	hashId := messageIdToHashId(messageID)
+	hashID := messageIDToHashID(messageID)
 	var stepBack func(string, int) (string, int)
-	stepBack = func(hashId string, depth int) (root string, rootDepth int) {
+	stepBack = func(hashID string, depth int) (root string, rootDepth int) {
 		if depth > 100 {
 			return
 		}
-		references := backReferences[hashId]
+		references := backReferences[hashID]
 		if len(references) == 0 {
-			return hashId, depth
+			return hashID, depth
 		}
 		for id, _ := range references {
 			root_, rootDepth_ := stepBack(id, depth+1)
@@ -129,7 +129,7 @@ func findThreadRoot(m *enmime.Envelope) (root string) {
 		}
 		return
 	}
-	root, _ = stepBack(hashId, 1)
+	root, _ = stepBack(hashID, 1)
 	return root
 }
 
@@ -157,18 +157,18 @@ func decodeRFC2047(header string) string {
 	}
 }
 
-// threadNodeByHashId returns the given message as a single threadNode,
-// i.e. the Children are not yet populated.  It handles the case the the hashId
+// threadNodeByHashID returns the given message as a single threadNode,
+// i.e. the Children are not yet populated.  It handles the case the the hashID
 // points to a fake thread root, i.e. a mail that is references to by other
 // mails, but that is not part of the mail archive.
-func threadNodeByHashId(hashId string) *threadNode {
+func threadNodeByHashID(hashID string) *threadNode {
 	mailPathsLock.RLock()
-	path := mailPaths[hashId]
+	path := mailPaths[hashID]
 	mailPathsLock.RUnlock()
 	if path == "" {
 		return &threadNode{
 			From:    "unknown",
-			Subject: "unknown (Hash-ID: " + hashId + ")",
+			Subject: "unknown (Hash-ID: " + hashID + ")",
 			RootURL: rootURL,
 		}
 	}
@@ -201,7 +201,7 @@ func threadNodeByHashId(hashId string) *threadNode {
 // buildThread returns the thread to the given root hash ID as a nested
 // structure of threadNode’s.
 func buildThread(root string) (rootNode *threadNode) {
-	rootNode = threadNodeByHashId(root)
+	rootNode = threadNodeByHashID(root)
 	childrenLock.RLock()
 	root_children := children[root]
 	childrenLock.RUnlock()
@@ -227,8 +227,8 @@ func buildThread(root string) (rootNode *threadNode) {
 		}
 	}
 	sort.SliceStable(rootNode.Children, func(i, j int) bool {
-		hashID_i := hashMessageId(rootNode.Children[i].MessageID)
-		hashID_j := hashMessageId(rootNode.Children[j].MessageID)
+		hashID_i := hashMessageID(rootNode.Children[i].MessageID)
+		hashID_j := hashMessageID(rootNode.Children[j].MessageID)
 		timestampsLock.RLock()
 		before := timestamps[hashID_i].Before(timestamps[hashID_j])
 		timestampsLock.RUnlock()
@@ -272,10 +272,10 @@ func readMail(mailPath string) (message *enmime.Envelope, threadRoot string, err
 	return
 }
 
-func readOriginMail(controller *web.Controller) (hashId string, message *enmime.Envelope, threadRoot string) {
-	hashId = controller.Ctx.Input.Param(":hash")
+func readOriginMail(controller *web.Controller) (hashID string, message *enmime.Envelope, threadRoot string) {
+	hashID = controller.Ctx.Input.Param(":hash")
 	mailPathsLock.RLock()
-	mailPath := mailPaths[hashId]
+	mailPath := mailPaths[hashID]
 	mailPathsLock.RUnlock()
 	message, threadRoot, err := readMail(mailPath)
 	if err != nil {
@@ -298,19 +298,19 @@ type MainController struct {
 func (this *MainController) Get() {
 	messageID := this.Ctx.Input.Param(":messageid")
 	var (
-		hashId, threadRoot, originHashID string
+		hashID, threadRoot, originHashID string
 		message                          *enmime.Envelope
 	)
 	if messageID == "" {
-		hashId, message, threadRoot = readOriginMail(&this.Controller)
-		originHashID = hashId
+		hashID, message, threadRoot = readOriginMail(&this.Controller)
+		originHashID = hashID
 		messageID = extractMessageID(message.GetHeader("Message-ID"))
 	} else {
 		var originThreadRoot string
 		originHashID, _, originThreadRoot = readOriginMail(&this.Controller)
-		hashId = hashMessageId(messageID)
+		hashID = hashMessageID(messageID)
 		mailPathsLock.RLock()
-		mailPath := mailPaths[hashId]
+		mailPath := mailPaths[hashID]
 		mailPathsLock.RUnlock()
 		var err error
 		message, threadRoot, err = readMail(mailPath)
@@ -322,7 +322,7 @@ func (this *MainController) Get() {
 		}
 		// FixMe: Check that mail is not newer than origin
 	}
-	this.Data["hash"] = hashId
+	this.Data["hash"] = hashID
 	if threadRoot != "" {
 		this.Data["thread"] = finalizeThread(messageID, originHashID, buildThread(threadRoot))
 	}
@@ -334,7 +334,7 @@ func (this *MainController) Get() {
 	this.Data["date"] = message.GetHeader("Date")
 	this.Data["text"] = message.Text
 	mailPathsLock.RLock()
-	path := mailPaths[hashId]
+	path := mailPaths[hashID]
 	mailPathsLock.RUnlock()
 	this.Data["link"] = pathToLink(path)
 	body, err := getBody(message.HTML)
@@ -367,9 +367,9 @@ func (this *AttachmentController) Get() {
 // shared with external due to technical or privacy reasons, and returns the
 // result.  It panics whenever something wents wrong, as it assumes that the
 // basic checks (e.g. that the mail file exists) have been made already.
-func filterHeaders(hashId string) []byte {
+func filterHeaders(hashID string) []byte {
 	mailPathsLock.RLock()
-	file, err := os.Open(mailPaths[hashId])
+	file, err := os.Open(mailPaths[hashID])
 	mailPathsLock.RUnlock()
 	check(err)
 	defer func() {
@@ -430,12 +430,12 @@ func (this *SendController) Get() {
 	if emailAddress == "" {
 		logger.Panicf("email address of %v not found", loginName)
 	}
-	hashId := this.Ctx.Input.Param(":hash")
-	mailBody := filterHeaders(hashId)
+	hashID := this.Ctx.Input.Param(":hash")
+	mailBody := filterHeaders(hashID)
 	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
 		[]string{emailAddress}, mailBody)
 	check(err)
-	this.Data["hash"] = hashId
+	this.Data["hash"] = hashID
 	this.Data["address"] = emailAddress
 	this.TplName = "sent.tpl"
 	this.Data["rooturl"] = rootURL
