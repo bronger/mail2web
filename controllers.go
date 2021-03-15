@@ -362,7 +362,29 @@ type AttachmentController struct {
 
 // Controller for downloading mail attachments.
 func (this *AttachmentController) Get() {
-	_, message, _ := readOriginMail(&this.Controller)
+	var message *enmime.Envelope
+	messageID := messageIDfromURL(this.Ctx.Input.Param(":messageid"))
+	if messageID == "" {
+		_, message, _ = readOriginMail(&this.Controller)
+	} else {
+		_, _, originThreadRoot := readOriginMail(&this.Controller)
+		hashID := messageIDToHashID(messageID)
+		mailPathsLock.RLock()
+		mailPath := mailPaths[hashID]
+		mailPathsLock.RUnlock()
+		var (
+			err        error
+			threadRoot typeHashID
+		)
+		message, threadRoot, err = readMail(mailPath)
+		if err != nil {
+			this.Abort("404")
+		}
+		if originThreadRoot != threadRoot {
+			this.Abort("403")
+		}
+		// FixMe: Check that mail is not newer than origin
+	}
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
 	this.Ctx.Output.Header("Content-Disposition",
