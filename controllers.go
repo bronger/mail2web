@@ -228,8 +228,8 @@ func buildThread(root hashID) (rootNode *threadNode) {
 		}
 	}
 	sort.SliceStable(rootNode.Children, func(i, j int) bool {
-		hashID_i := hashMessageID(rootNode.Children[i].MessageID)
-		hashID_j := hashMessageID(rootNode.Children[j].MessageID)
+		hashID_i := messageIDToHashID(rootNode.Children[i].MessageID)
+		hashID_j := messageIDToHashID(rootNode.Children[j].MessageID)
 		timestampsLock.RLock()
 		before := timestamps[hashID_i].Before(timestamps[hashID_j])
 		timestampsLock.RUnlock()
@@ -315,7 +315,7 @@ func (this *MainController) Get() {
 	} else {
 		var originThreadRoot typeHashID
 		originHashID, _, originThreadRoot = readOriginMail(&this.Controller)
-		hashID = hashMessageID(messageID)
+		hashID = messageIDToHashID(messageID)
 		mailPathsLock.RLock()
 		mailPath := mailPaths[hashID]
 		mailPathsLock.RUnlock()
