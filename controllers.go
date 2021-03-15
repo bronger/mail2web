@@ -314,6 +314,7 @@ func (this *MainController) Get() {
 		hashID, message, threadRoot = readOriginMail(&this.Controller)
 		originHashID = hashID
 		messageID = extractMessageID(message.GetHeader("Message-ID"))
+		this.Data["link"] = template.URL(hashID)
 	} else {
 		var originThreadRoot typeHashID
 		originHashID, _, originThreadRoot = readOriginMail(&this.Controller)
@@ -330,8 +331,8 @@ func (this *MainController) Get() {
 			this.Abort("403")
 		}
 		// FixMe: Check that mail is not newer than origin
+		this.Data["link"] = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(messageID)))
 	}
-	this.Data["hash"] = hashID
 	if threadRoot != "" {
 		this.Data["thread"] = finalizeThread(messageID, originHashID, buildThread(threadRoot))
 	}

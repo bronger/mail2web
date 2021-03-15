@@ -6,7 +6,7 @@
 <body>
 <h1>Mail {{.name}}</h1>
 
-<p><a href="{{.rooturl}}/restricted/{{.hash}}/send">Send this to me!</a></p>
+<p><a href="{{.rooturl}}/restricted/{{.link}}/send">Send this to me!</a></p>
 <p><a href="{{.rooturl}}/restricted/my_mails">Show me my mails</a></p>
 {{if .thread}}
 <h2>Thread</h2>
@@ -55,7 +55,7 @@
 {{if .attachments}}
 <h2>Attachments</h2>
 {{range $i, $name := .attachments}}
-<p><a href="{{$.rooturl}}/{{$.hash}}/{{$i}}">{{$name}}</a></p>
+<p><a href="{{$.rooturl}}/{{$.link}}/{{$i}}">{{$name}}</a></p>
 {{end}}
 {{end}}
 </body>
