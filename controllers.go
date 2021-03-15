@@ -111,7 +111,6 @@ func findThreadRoot(m *enmime.Envelope) (root string) {
 	if messageID == "" {
 		return ""
 	}
-	hashID := messageIDToHashID(messageID)
 	var stepBack func(string, int) (string, int)
 	stepBack = func(hashID string, depth int) (root string, rootDepth int) {
 		if depth > 100 {
@@ -129,7 +128,7 @@ func findThreadRoot(m *enmime.Envelope) (root string) {
 		}
 		return
 	}
-	root, _ = stepBack(hashID, 1)
+	root, _ = stepBack(messageIDToHashID(messageID), 1)
 	return root
 }
 
