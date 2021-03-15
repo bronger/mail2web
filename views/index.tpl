@@ -12,8 +12,8 @@
 <h2>Thread</h2>
 <ul>
   <li>
-    {{if .thread.OriginHashID}}
-    <a href="{{.thread.RootURL}}/{{.thread.OriginHashID}}/{{.thread.MessageID}}"><strong>{{.thread.From}}:</strong> {{.thread.Subject}}</a>
+    {{if .thread.Link}}
+    <a href="{{.thread.RootURL}}/{{.thread.Link}}"><strong>{{.thread.From}}:</strong> {{.thread.Subject}}</a>
     {{else}}
     <strong>{{.thread.From}}:</strong> {{.thread.Subject}}
     {{end}}

@@ -140,7 +140,7 @@ type threadNode struct {
 	MessageID     messageID
 	From, Subject string
 	RootURL       string
-	OriginHashID  hashID
+	Link          template.URL
 	Children      []*threadNode
 }
 
@@ -238,18 +238,24 @@ func buildThread(root hashID) (rootNode *threadNode) {
 	return
 }
 
+func messageIDtoURL(messageID messageID) string {
+	return strings.ReplaceAll(string(messageID), "/", ">")
+}
+
+func messageIDfromURL(urlComponent string) messageID {
+	return messageID(strings.ReplaceAll(urlComponent, ">", "/"))
+}
+
 // finalizeThread walks through a thread and removes the links (which is
 // identical to the hash ID since this is the only elements in the URL path)
 // from the node the hash ID of which matches the given one.  The reason is
 // that when displaying the thread in the browser, the current email should not
 // be hyperlinked.
 func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode) *threadNode {
-	// FixMe: Replace "/" with "%2f"
 	if thread.MessageID == messageID {
-		thread.MessageID = ""
-		thread.OriginHashID = ""
+		thread.Link = ""
 	} else {
-		thread.OriginHashID = originHashID
+		thread.Link = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(thread.MessageID)))
 	}
 	for _, child := range thread.Children {
 		finalizeThread(messageID, originHashID, child)
@@ -297,7 +303,7 @@ type MainController struct {
 
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
-	messageID := messageID(this.Ctx.Input.Param(":messageid"))
+	messageID := messageIDfromURL(this.Ctx.Input.Param(":messageid"))
 	var (
 		hashID, threadRoot, originHashID hashID
 		message                          *enmime.Envelope
