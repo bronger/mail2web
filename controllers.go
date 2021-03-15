@@ -345,7 +345,7 @@ func (this *MainController) Get() {
 	mailPathsLock.RLock()
 	path := mailPaths[hashID]
 	mailPathsLock.RUnlock()
-	this.Data["link"] = pathToLink(path)
+	this.Data["name"] = pathToLink(path)
 	body, err := getBody(message.HTML)
 	check(err)
 	this.Data["html"] = template.HTML(body)
