@@ -22,7 +22,8 @@ var permissions struct {
 	Admin     string
 	Addresses map[string][]string
 	Groups    map[string]struct {
-		Members, Threads, Mails map[string]bool
+		Members        map[string]bool
+		Threads, Mails map[hashID]bool
 	}
 }
 
@@ -85,32 +86,31 @@ func getEmailAddresses(loginName string) []string {
 	return permissions.Addresses[loginName]
 }
 
-func isAllowed(loginName, folder, id string, threadRoot string) (allowed bool) {
+func isAllowed(loginName string, hashID hashID, threadRoot hashID) (allowed bool) {
 	allowed = false
-	path := folder + "/" + id
 	if loginName == permissions.Admin {
 		allowed = true
 	} else {
 		for _, group := range permissions.Groups {
-			if group.Members[loginName] && (group.Threads[threadRoot] || group.Mails[path]) {
+			if group.Members[loginName] && (group.Threads[threadRoot] || group.Mails[hashID]) {
 				allowed = true
 				break
 			}
 		}
 	}
 	if allowed {
-		logger.Println(fmt.Sprintf("granted %v access to %v/%v", loginName, folder, id))
+		logger.Println(fmt.Sprintf("granted %v access to %v", loginName, hashID))
 	} else {
-		logger.Println(fmt.Sprintf("denied %v access to %v/%v", loginName, folder, id))
+		logger.Println(fmt.Sprintf("denied %v access to %v", loginName, hashID))
 	}
 	return allowed
 }
 
-func hashMessageID(messageID string) string {
+func hashMessageID(messageID messageID) hashID {
 	hasher := sha256.New()
 	hasher.Write(secretKey)
 	hasher.Write([]byte(messageID))
-	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))[:10]
+	return hashID(base64.URLEncoding.EncodeToString(hasher.Sum(nil))[:10])
 }
 
 func init() {

@@ -24,6 +24,8 @@ import (
 	"golang.org/x/net/html"
 )
 
+type typeHashID = hashID
+
 func check(e error) {
 	if e != nil {
 		logger.Panic(e)
@@ -94,25 +96,25 @@ func getBody(htmlDocument string) (string, error) {
 	return buffer.String(), nil
 }
 
-func extractMessageID(rawHeader string) string {
+func extractMessageID(rawHeader string) messageID {
 	match := referenceRegex.FindStringSubmatch(rawHeader)
 	if len(match) < 2 {
 		return ""
 	}
-	return match[1]
+	return messageID(match[1])
 }
 
 // findThreadRoot returns the hash ID of the root element of the thread the
 // given mail appears in.  If there is no thread, the hash ID of the given mail
 // is returned.  It returns the empty string if that hash ID cannot be
 // extracted, or if the thread has a depth larger than 100.
-func findThreadRoot(m *enmime.Envelope) (root string) {
+func findThreadRoot(m *enmime.Envelope) (root hashID) {
 	messageID := extractMessageID(m.GetHeader("Message-ID"))
 	if messageID == "" {
 		return ""
 	}
-	var stepBack func(string, int) (string, int)
-	stepBack = func(hashID string, depth int) (root string, rootDepth int) {
+	var stepBack func(hashID, int) (hashID, int)
+	stepBack = func(hashID hashID, depth int) (root hashID, rootDepth int) {
 		if depth > 100 {
 			return
 		}
@@ -135,10 +137,10 @@ func findThreadRoot(m *enmime.Envelope) (root string) {
 // threadNode represents one mail in a nested thread.  All members are
 // expotable because they are needed in the templates.
 type threadNode struct {
-	MessageID     string
+	MessageID     messageID
 	From, Subject string
 	RootURL       string
-	OriginHashID  string
+	OriginHashID  hashID
 	Children      []*threadNode
 }
 
@@ -160,14 +162,14 @@ func decodeRFC2047(header string) string {
 // i.e. the Children are not yet populated.  It handles the case the the hashID
 // points to a fake thread root, i.e. a mail that is references to by other
 // mails, but that is not part of the mail archive.
-func threadNodeByHashID(hashID string) *threadNode {
+func threadNodeByHashID(hashID hashID) *threadNode {
 	mailPathsLock.RLock()
 	path := mailPaths[hashID]
 	mailPathsLock.RUnlock()
 	if path == "" {
 		return &threadNode{
 			From:    "unknown",
-			Subject: "unknown (Hash-ID: " + hashID + ")",
+			Subject: "unknown (Hash-ID: " + string(hashID) + ")",
 			RootURL: rootURL,
 		}
 	}
@@ -199,12 +201,12 @@ func threadNodeByHashID(hashID string) *threadNode {
 
 // buildThread returns the thread to the given root hash ID as a nested
 // structure of threadNode’s.
-func buildThread(root string) (rootNode *threadNode) {
+func buildThread(root hashID) (rootNode *threadNode) {
 	rootNode = threadNodeByHashID(root)
 	childrenLock.RLock()
 	root_children := children[root]
 	childrenLock.RUnlock()
-	children := make(map[string]bool)
+	children := make(map[hashID]bool)
 	for child, _ := range root_children {
 		children[child] = true
 	}
@@ -241,7 +243,7 @@ func buildThread(root string) (rootNode *threadNode) {
 // from the node the hash ID of which matches the given one.  The reason is
 // that when displaying the thread in the browser, the current email should not
 // be hyperlinked.
-func finalizeThread(messageID, originHashID string, thread *threadNode) *threadNode {
+func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode) *threadNode {
 	// FixMe: Replace "/" with "%2f"
 	if thread.MessageID == messageID {
 		thread.MessageID = ""
@@ -255,7 +257,7 @@ func finalizeThread(messageID, originHashID string, thread *threadNode) *threadN
 	return thread
 }
 
-func readMail(mailPath string) (message *enmime.Envelope, threadRoot string, err error) {
+func readMail(mailPath string) (message *enmime.Envelope, threadRoot hashID, err error) {
 	file, err := os.Open(mailPath)
 	if errors.Is(err, fs.ErrNotExist) {
 		return
@@ -271,8 +273,8 @@ func readMail(mailPath string) (message *enmime.Envelope, threadRoot string, err
 	return
 }
 
-func readOriginMail(controller *web.Controller) (hashID string, message *enmime.Envelope, threadRoot string) {
-	hashID = controller.Ctx.Input.Param(":hash")
+func readOriginMail(controller *web.Controller) (hashID hashID, message *enmime.Envelope, threadRoot hashID) {
+	hashID = typeHashID(controller.Ctx.Input.Param(":hash"))
 	mailPathsLock.RLock()
 	mailPath := mailPaths[hashID]
 	mailPathsLock.RUnlock()
@@ -295,9 +297,9 @@ type MainController struct {
 
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
-	messageID := this.Ctx.Input.Param(":messageid")
+	messageID := messageID(this.Ctx.Input.Param(":messageid"))
 	var (
-		hashID, threadRoot, originHashID string
+		hashID, threadRoot, originHashID hashID
 		message                          *enmime.Envelope
 	)
 	if messageID == "" {
@@ -305,7 +307,7 @@ func (this *MainController) Get() {
 		originHashID = hashID
 		messageID = extractMessageID(message.GetHeader("Message-ID"))
 	} else {
-		var originThreadRoot string
+		var originThreadRoot typeHashID
 		originHashID, _, originThreadRoot = readOriginMail(&this.Controller)
 		hashID = hashMessageID(messageID)
 		mailPathsLock.RLock()
@@ -366,7 +368,7 @@ func (this *AttachmentController) Get() {
 // shared with external due to technical or privacy reasons, and returns the
 // result.  It panics whenever something wents wrong, as it assumes that the
 // basic checks (e.g. that the mail file exists) have been made already.
-func filterHeaders(hashID string) []byte {
+func filterHeaders(hashID hashID) []byte {
 	mailPathsLock.RLock()
 	file, err := os.Open(mailPaths[hashID])
 	mailPathsLock.RUnlock()
@@ -429,7 +431,7 @@ func (this *SendController) Get() {
 	if emailAddress == "" {
 		logger.Panicf("email address of %v not found", loginName)
 	}
-	hashID := this.Ctx.Input.Param(":hash")
+	hashID := hashID(this.Ctx.Input.Param(":hash"))
 	mailBody := filterHeaders(hashID)
 	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
 		[]string{emailAddress}, mailBody)
