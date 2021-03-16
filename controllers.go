@@ -304,25 +304,17 @@ func pathToLink(path string) string {
 	return folder + "/" + id
 }
 
-type MainController struct {
-	web.Controller
-}
-
-// Controller for viewing a particular email.
-func (this *MainController) Get() {
-	messageID := messageIDfromURL(this.Ctx.Input.Param(":messageid"))
-	var (
-		hashID, threadRoot, originHashID hashID
-		message                          *enmime.Envelope
-	)
+func getMailAndThread(controller *web.Controller) (
+	messageID messageID, hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
+	messageID = messageIDfromURL(controller.Ctx.Input.Param(":messageid"))
 	if messageID == "" {
-		hashID, message, threadRoot = readOriginMail(&this.Controller)
+		hashID, message, threadRoot = readOriginMail(controller)
 		originHashID = hashID
 		messageID = extractMessageID(message.GetHeader("Message-ID"))
-		this.Data["link"] = template.URL(hashID)
+		controller.Data["link"] = template.URL(hashID)
 	} else {
 		var originThreadRoot typeHashID
-		originHashID, _, originThreadRoot = readOriginMail(&this.Controller)
+		originHashID, _, originThreadRoot = readOriginMail(controller)
 		hashID = messageIDToHashID(messageID)
 		mailPathsLock.RLock()
 		mailPath := mailPaths[hashID]
@@ -330,19 +322,29 @@ func (this *MainController) Get() {
 		var err error
 		message, threadRoot, err = readMail(mailPath)
 		if err != nil {
-			this.Abort("404")
+			controller.Abort("404")
 		}
 		if originThreadRoot != threadRoot {
-			this.Abort("403")
+			controller.Abort("403")
 		}
 		timestampsLock.RLock()
 		after := timestamps[hashID].After(timestamps[originHashID])
 		timestampsLock.RUnlock()
 		if after {
-			this.Abort("403")
+			controller.Abort("403")
 		}
-		this.Data["link"] = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(messageID)))
+		controller.Data["link"] = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(messageID)))
 	}
+	return
+}
+
+type MainController struct {
+	web.Controller
+}
+
+// Controller for viewing a particular email.
+func (this *MainController) Get() {
+	messageID, hashID, threadRoot, originHashID, message := getMailAndThread(&this.Controller)
 	if threadRoot != "" {
 		this.Data["thread"] = finalizeThread(messageID, originHashID, buildThread(threadRoot, originHashID))
 	}
@@ -373,34 +375,7 @@ type AttachmentController struct {
 
 // Controller for downloading mail attachments.
 func (this *AttachmentController) Get() {
-	var message *enmime.Envelope
-	messageID := messageIDfromURL(this.Ctx.Input.Param(":messageid"))
-	if messageID == "" {
-		_, message, _ = readOriginMail(&this.Controller)
-	} else {
-		originHashID, _, originThreadRoot := readOriginMail(&this.Controller)
-		hashID := messageIDToHashID(messageID)
-		mailPathsLock.RLock()
-		mailPath := mailPaths[hashID]
-		mailPathsLock.RUnlock()
-		var (
-			err        error
-			threadRoot typeHashID
-		)
-		message, threadRoot, err = readMail(mailPath)
-		if err != nil {
-			this.Abort("404")
-		}
-		if originThreadRoot != threadRoot {
-			this.Abort("403")
-		}
-		timestampsLock.RLock()
-		after := timestamps[hashID].After(timestamps[originHashID])
-		timestampsLock.RUnlock()
-		if after {
-			this.Abort("403")
-		}
-	}
+	_, _, _, _, message := getMailAndThread(&this.Controller)
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
 	this.Ctx.Output.Header("Content-Disposition",
