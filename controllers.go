@@ -124,7 +124,7 @@ func findThreadRoot(m *enmime.Envelope) (root hashID) {
 		}
 		for id, _ := range references {
 			root_, rootDepth_ := stepBack(id, depth+1)
-			if rootDepth_ > rootDepth {
+			if rootDepth_ > rootDepth || rootDepth_ == rootDepth && root_ > root {
 				root, rootDepth = root_, rootDepth_
 			}
 		}
