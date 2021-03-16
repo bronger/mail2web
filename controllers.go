@@ -325,12 +325,15 @@ func getMailAndThread(controller *web.Controller) (
 			controller.Abort("404")
 		}
 		if originThreadRoot != threadRoot {
+			logger.Printf("Denied access because message ID %v and hash ID %v are different threads: %v, %v",
+				messageID, originHashID, originThreadRoot, threadRoot)
 			controller.Abort("403")
 		}
 		timestampsLock.RLock()
 		after := timestamps[hashID].After(timestamps[originHashID])
 		timestampsLock.RUnlock()
 		if after {
+			logger.Printf("Denied access because message %v is too new\n", messageID)
 			controller.Abort("403")
 		}
 		controller.Data["link"] = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(messageID)))
