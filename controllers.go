@@ -452,7 +452,7 @@ func (this *SendController) Get() {
 	if emailAddress == "" {
 		logger.Panicf("email address of %v not found", loginName)
 	}
-	hashID := hashID(this.Ctx.Input.Param(":hash"))
+	_, hashID, _, _, _ := getMailAndThread(&this.Controller)
 	mailBody := filterHeaders(hashID)
 	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
 		[]string{emailAddress}, mailBody)
