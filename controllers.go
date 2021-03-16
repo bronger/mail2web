@@ -169,7 +169,7 @@ func threadNodeByHashID(hashID hashID) *threadNode {
 	if path == "" {
 		return &threadNode{
 			From:    "unknown",
-			Subject: "unknown (Hash-ID: " + string(hashID) + ")",
+			Subject: "unknown",
 			RootURL: rootURL,
 		}
 	}
