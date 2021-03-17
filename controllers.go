@@ -147,8 +147,8 @@ type threadNode struct {
 // decodeRFC2047 returns the given raw mail header (RFC-2047-encoded and
 // quoted-printable) to a proper string.
 func decodeRFC2047(header string) string {
-	dec := new(mime.WordDecoder)
-	result, err := dec.DecodeHeader(header)
+	var decoder mime.WordDecoder
+	result, err := decoder.DecodeHeader(header)
 	if err == nil {
 		return result
 	} else {
