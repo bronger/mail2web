@@ -22,6 +22,7 @@ import (
 	"github.com/beego/beego/v2/server/web"
 	"github.com/jhillyerd/enmime"
 	"golang.org/x/net/html"
+	"golang.org/x/text/encoding/charmap"
 )
 
 type typeHashID = hashID
@@ -147,7 +148,19 @@ type threadNode struct {
 // decodeRFC2047 returns the given raw mail header (RFC-2047-encoded and
 // quoted-printable) to a proper string.
 func decodeRFC2047(header string) string {
-	var decoder mime.WordDecoder
+	decoder := mime.WordDecoder{
+		func(charset string, input io.Reader) (io.Reader, error) {
+			switch charset {
+			case "windows-1252", "cp1252":
+				return charmap.Windows1252.NewDecoder().Reader(input), nil
+			case "iso-8859-2":
+				return charmap.ISO8859_2.NewDecoder().Reader(input), nil
+			case "iso-8859-15":
+				return charmap.ISO8859_15.NewDecoder().Reader(input), nil
+			}
+			return nil, fmt.Errorf("unknown encoding %v", header)
+		},
+	}
 	result, err := decoder.DecodeHeader(header)
 	if err == nil {
 		return result
