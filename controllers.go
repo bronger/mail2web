@@ -311,12 +311,6 @@ func readOriginMail(controller *web.Controller) (hashID hashID, message *enmime.
 	return
 }
 
-func pathToLink(path string) string {
-	prefix, id := filepath.Split(path)
-	_, folder := filepath.Split(strings.TrimSuffix(prefix, "/"))
-	return folder + "/" + id
-}
-
 func getMailAndThread(controller *web.Controller) (
 	messageID messageID, hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
 	messageID = messageIDfromURL(controller.Ctx.Input.Param(":messageid"))
@@ -352,6 +346,12 @@ func getMailAndThread(controller *web.Controller) (
 		controller.Data["link"] = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(messageID)))
 	}
 	return
+}
+
+func pathToLink(path string) string {
+	prefix, id := filepath.Split(path)
+	_, folder := filepath.Split(strings.TrimSuffix(prefix, "/"))
+	return folder + "/" + id
 }
 
 type MainController struct {
