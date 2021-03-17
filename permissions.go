@@ -82,6 +82,7 @@ func getEmailAddress(loginName string) string {
 	}
 }
 
+// getEmailAddress returns all email addresses the given user can read.
 func getEmailAddresses(loginName string) []string {
 	return permissions.Addresses[loginName]
 }
@@ -106,6 +107,7 @@ func isAllowed(loginName string, hashID hashID, threadRoot hashID) (allowed bool
 	return allowed
 }
 
+// hashMessageID hashes the message ID with a salt taken from SECRET_KEY_PATH.
 func hashMessageID(messageID messageID) hashID {
 	hasher := sha256.New()
 	hasher.Write(secretKey)

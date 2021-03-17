@@ -65,6 +65,7 @@ func parseBackreferences(field string) (result map[hashID]bool) {
 	return
 }
 
+// mailInfo is used in the HTML views and thus needs public fields.
 type mailInfo struct {
 	HashID        hashID
 	MessageID     messageID
@@ -84,6 +85,8 @@ type update struct {
 	mailInfo
 }
 
+// getAddresses returns a set with all mail adresses found in the "update"
+// object in its From, To, Cc, and Bcc fields.
 func (update update) getAddresses() (addresses map[string]bool) {
 	matches := emailRegex.FindAllStringSubmatch(update.rawFrom, -1)
 	matches = append(matches, emailRegex.FindAllStringSubmatch(update.rawTo, -1)...)

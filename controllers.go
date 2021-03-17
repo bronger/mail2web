@@ -97,6 +97,9 @@ func getBody(htmlDocument string) (string, error) {
 	return buffer.String(), nil
 }
 
+// extractMessageID takes the value of the “Message-ID” header field of an
+// email and strips whitespace and the <…> brackets.  It returns the pure
+// message ID, or the empty string if no ID was found.
 func extractMessageID(rawHeader string) messageID {
 	match := referenceRegex.FindStringSubmatch(rawHeader)
 	if len(match) < 2 {
@@ -146,7 +149,7 @@ type threadNode struct {
 }
 
 // decodeRFC2047 returns the given raw mail header (RFC-2047-encoded and
-// quoted-printable) to a proper string.
+// quoted-printable) as a proper string.
 func decodeRFC2047(header string) string {
 	decoder := mime.WordDecoder{
 		func(charset string, input io.Reader) (io.Reader, error) {
@@ -256,10 +259,17 @@ func buildThread(root, originHashID hashID) (rootNode *threadNode) {
 	return
 }
 
+// messageIDtoURL returns a URL-safe string representation of the given message
+// ID.  It still needs proper percent escaping, it just handles slashes in
+// message IDs, which never seem to be esscaped by Go’s template engine.  See,
+// e.g., <https://github.com/golang/go/issues/3659>.
 func messageIDtoURL(messageID messageID) string {
 	return strings.ReplaceAll(string(messageID), "/", ">")
 }
 
+// messageIDfromURL is the inverse of messageIDtoURL.  It takes a URL component
+// (i.e., something that must never contain slashes) and returns the original
+// message ID.
 func messageIDfromURL(urlComponent string) messageID {
 	return messageID(strings.ReplaceAll(urlComponent, ">", "/"))
 }
@@ -283,6 +293,12 @@ func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode
 	return thread
 }
 
+// readMail reads an RFC 5322 file and returns it as a mail object.
+// Furthermore, it traces back all back references to get the root of the
+// thread this mail belongs to.  This root may not be part of the mail archive
+// but just be given by its hashed message ID.  (“Fake root”)
+//
+// The returned error is non-nil only if the mail file could not be found.
 func readMail(mailPath string) (message *enmime.Envelope, threadRoot hashID, err error) {
 	file, err := os.Open(mailPath)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -299,6 +315,10 @@ func readMail(mailPath string) (message *enmime.Envelope, threadRoot hashID, err
 	return
 }
 
+// readOriginMail is a helper for getMailAndThread.  It returns hash ID,
+// message object, and thread root ID for the *origin* mail, i.e. the one given
+// in the hash component of the URL (in contrast to the optional message ID
+// component).  It may trigger an HTTP 404 if the mail file was not found.
 func readOriginMail(controller *web.Controller) (hashID hashID, message *enmime.Envelope, threadRoot hashID) {
 	hashID = typeHashID(controller.Ctx.Input.Param(":hash"))
 	mailPathsLock.RLock()
@@ -311,6 +331,11 @@ func readOriginMail(controller *web.Controller) (hashID hashID, message *enmime.
 	return
 }
 
+// getMailAndThread encapsulates common code used in some controllers.  It
+// returns data for both the concrete (given by the message ID in the URL) and
+// the original mail (given by the hash in the URL).  It checks for validity of
+// the URL (in particular, whether the message ID is allowed to be retreived)
+// and may trigger HTTP 4… errors.
 func getMailAndThread(controller *web.Controller) (
 	messageID messageID, hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
 	messageID = messageIDfromURL(controller.Ctx.Input.Param(":messageid"))
@@ -348,6 +373,8 @@ func getMailAndThread(controller *web.Controller) (
 	return
 }
 
+// pathToLink generates a nice title for the mail Web page.  It extracts the
+// “folder/id” from the given full mail path.
 func pathToLink(path string) string {
 	prefix, id := filepath.Split(path)
 	_, folder := filepath.Split(strings.TrimSuffix(prefix, "/"))
