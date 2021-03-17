@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -85,26 +84,6 @@ func getEmailAddress(loginName string) string {
 // getEmailAddress returns all email addresses the given user can read.
 func getEmailAddresses(loginName string) []string {
 	return permissions.Addresses[loginName]
-}
-
-func isAllowed(loginName string, hashID hashID, threadRoot hashID) (allowed bool) {
-	allowed = false
-	if loginName == permissions.Admin {
-		allowed = true
-	} else {
-		for _, group := range permissions.Groups {
-			if group.Members[loginName] && (group.Threads[threadRoot] || group.Mails[hashID]) {
-				allowed = true
-				break
-			}
-		}
-	}
-	if allowed {
-		logger.Println(fmt.Sprintf("granted %v access to %v", loginName, hashID))
-	} else {
-		logger.Println(fmt.Sprintf("denied %v access to %v", loginName, hashID))
-	}
-	return allowed
 }
 
 // hashMessageID hashes the message ID with a salt taken from SECRET_KEY_PATH.
