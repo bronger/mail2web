@@ -129,3 +129,11 @@ The respectively first mail address is the primary personal address of that
 user, which is used to send mails to them.  The other mail addresses belong to
 mail boxes the user can read, too.  They are used to compile the mails for the
 user in the “my mails” page.
+
+
+Getting the URLs
+================
+
+In order to get the URL to a mail as the owner of the mails, call
+``mail2hash.py`` and pass the path to the respective mail file.  You must edit
+its source code, however, and adapt the ``root_url`` and ``pepper`` variables.
