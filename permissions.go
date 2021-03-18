@@ -86,7 +86,8 @@ func getEmailAddresses(loginName string) []string {
 	return permissions.Addresses[loginName]
 }
 
-// hashMessageID hashes the message ID with a salt taken from SECRET_KEY_PATH.
+// hashMessageID hashes the message ID with a pepper taken from
+// SECRET_KEY_PATH.
 func hashMessageID(messageID messageID) hashID {
 	hasher := sha256.New()
 	hasher.Write(secretKey)

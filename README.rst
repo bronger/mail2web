@@ -11,7 +11,7 @@ Security
 ========
 
 Mails may be very sensitive, so security in mail2web is crucial.  This is
-achieved by addressing all mail using a salted hash like this::
+achieved by addressing all mail using a peppered hash like this::
 
   https://mymails.example.com/87g46e5i78
 
@@ -70,8 +70,8 @@ Environment
 
 ``SECRET_KEY_PATH``
   Absolute path to a text file with a secret string which is used e.g. as a
-  salt for hashes.  All white space at the beginning and the end of the string
-  (inclusing line breaks) is removed.  The default is
+  pepper for hashes.  All white space at the beginning and the end of the
+  string (inclusing line breaks) is removed.  The default is
   ``/var/lib/mail2web_secrets/secret_key``.
 
 ``ROOT_URL``
