@@ -282,7 +282,7 @@ func messageIDfromURL(urlComponent string) messageID {
 func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode) *threadNode {
 	if thread.MessageID == "" || thread.MessageID == messageID {
 		thread.Link = ""
-	} else if hashMessageID(thread.MessageID) == originHashID {
+	} else if hashMessageID(thread.MessageID, "") == originHashID {
 		thread.Link = template.URL(originHashID)
 	} else {
 		thread.Link = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(thread.MessageID)))

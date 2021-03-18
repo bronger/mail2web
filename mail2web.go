@@ -46,7 +46,7 @@ func messageIDToHashID(messageID messageID) (hashID hashID) {
 	hashID, ok := hashIDs[messageID]
 	hashIDsLock.RUnlock()
 	if !ok {
-		hashID = hashMessageID(messageID)
+		hashID = hashMessageID(messageID, "")
 		hashIDsLock.Lock()
 		hashIDs[messageID] = hashID
 		hashIDsLock.Unlock()

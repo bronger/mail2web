@@ -87,10 +87,15 @@ func getEmailAddresses(loginName string) []string {
 }
 
 // hashMessageID hashes the message ID with a pepper taken from
-// SECRET_KEY_PATH.
-func hashMessageID(messageID messageID) hashID {
+// SECRET_KEY_PATH.  The salt can be used to add futher entropy, effectively
+// selecting a hash namespace.
+func hashMessageID(messageID messageID, salt string) hashID {
 	hasher := sha256.New()
 	hasher.Write(secretKey)
+	if salt != "" {
+		// “>” is guaranteed to never occur in message IDs.
+		hasher.Write([]byte(salt + ">"))
+	}
 	hasher.Write([]byte(messageID))
 	return hashID(base64.URLEncoding.EncodeToString(hasher.Sum(nil))[:10])
 }
