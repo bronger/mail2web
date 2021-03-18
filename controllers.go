@@ -327,7 +327,7 @@ func readMail(mailPath string) (message *enmime.Envelope, threadRoot hashID, err
 // in the hash component of the URL (in contrast to the optional message ID
 // component).  It may trigger an HTTP 404 if the mail file was not found.
 func readOriginMail(controller *web.Controller) (
-	hashID hashID, message *enmime.Envelope, threadRoot hashID, messageID messageID, full bool) {
+	hashID hashID, message *enmime.Envelope, threadRoot hashID, messageID messageID, tokenFull string) {
 	hashID = typeHashID(controller.Ctx.Input.Param(":hash"))
 	mailPathsLock.RLock()
 	mailPath := mailPaths[hashID]
@@ -337,13 +337,9 @@ func readOriginMail(controller *web.Controller) (
 		controller.Abort("404")
 	}
 	messageID = extractMessageID(message.GetHeader("Message-ID"))
-	tokenFull := controller.GetString("tokenFull")
-	if tokenFull != "" {
-		if tokenFull != string(hashMessageID(messageID, "full")) {
-			controller.Abort("403")
-		} else {
-			full = true
-		}
+	tokenFull = controller.GetString("tokenFull")
+	if tokenFull != "" && tokenFull != string(hashMessageID(messageID, "full")) {
+		controller.Abort("403")
 	}
 	return
 }
@@ -354,15 +350,15 @@ func readOriginMail(controller *web.Controller) (
 // the URL (in particular, whether the message ID is allowed to be retreived
 // and whether a tokenFull is valid) and may trigger HTTP 4… errors.
 func getMailAndThreadRoot(controller *web.Controller) (
-	full bool, messageID messageID, hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
+	tokenFull string, messageID messageID, hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
 	messageID = messageIDfromURL(controller.Ctx.Input.Param(":messageid"))
 	if messageID == "" {
-		hashID, message, threadRoot, messageID, full = readOriginMail(controller)
+		hashID, message, threadRoot, messageID, tokenFull = readOriginMail(controller)
 		originHashID = hashID
 		controller.Data["link"] = template.URL(hashID)
 	} else {
 		var originThreadRoot typeHashID
-		originHashID, _, originThreadRoot, _, full = readOriginMail(controller)
+		originHashID, _, originThreadRoot, _, tokenFull = readOriginMail(controller)
 		hashID = messageIDToHashID(messageID)
 		mailPathsLock.RLock()
 		mailPath := mailPaths[hashID]
@@ -377,7 +373,7 @@ func getMailAndThreadRoot(controller *web.Controller) (
 				messageID, originHashID, originThreadRoot, threadRoot)
 			controller.Abort("403")
 		}
-		if !full {
+		if tokenFull != "" {
 			timestampsLock.RLock()
 			after := timestamps[hashID].After(timestamps[originHashID])
 			timestampsLock.RUnlock()
@@ -405,10 +401,10 @@ type MainController struct {
 
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
-	full, messageID, hashID, threadRoot, originHashID, message := getMailAndThreadRoot(&this.Controller)
+	tokenFull, messageID, hashID, threadRoot, originHashID, message := getMailAndThreadRoot(&this.Controller)
 	if threadRoot != "" {
 		this.Data["thread"] = finalizeThread(
-			messageID, originHashID, buildThread(threadRoot, originHashID, full), this.GetString("tokenFull"))
+			messageID, originHashID, buildThread(threadRoot, originHashID, tokenFull != ""), tokenFull)
 	}
 	this.TplName = "index.tpl"
 	this.Data["rooturl"] = rootURL
