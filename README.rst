@@ -17,7 +17,8 @@ achieved by addressing all mail using a peppered hash like this::
 
 Let us call the mail addressed by this link the *origin mail*.  The link also
 exposes the thread associated with the origin mail to everyone that has that
-link, but only those mails that are older than the origin mail.
+link, but only those mails that are older than the origin mail.  (Unless you
+pass the right ``tokenFull`` in the query string.)
 
 The hash is base64-URL-encoded with 10 characters, so it has :math:`2^{60}`
 possible values.  If you have e.g. :math:`2^{17}` ≈ 130,000 mails, attackers

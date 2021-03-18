@@ -217,7 +217,7 @@ func threadNodeByHashID(hashID hashID) *threadNode {
 
 // buildThread returns the thread to the given root hash ID as a nested
 // structure of threadNode’s.
-func buildThread(root, originHashID hashID) (rootNode *threadNode) {
+func buildThread(root, originHashID hashID, full bool) (rootNode *threadNode) {
 	rootNode = threadNodeByHashID(root)
 	childrenLock.RLock()
 	root_children := children[root]
@@ -227,11 +227,13 @@ func buildThread(root, originHashID hashID) (rootNode *threadNode) {
 		children[child] = true
 	}
 	for child, _ := range root_children {
-		timestampsLock.RLock()
-		after := timestamps[child].After(timestamps[originHashID])
-		timestampsLock.RUnlock()
-		if after {
-			continue
+		if !full {
+			timestampsLock.RLock()
+			after := timestamps[child].After(timestamps[originHashID])
+			timestampsLock.RUnlock()
+			if after {
+				continue
+			}
 		}
 		grandChild := false
 		for backReference, _ := range backReferences[child] {
@@ -243,7 +245,7 @@ func buildThread(root, originHashID hashID) (rootNode *threadNode) {
 		if grandChild {
 			continue
 		}
-		childNode := buildThread(child, originHashID)
+		childNode := buildThread(child, originHashID, full)
 		if childNode != nil {
 			rootNode.Children = append(rootNode.Children, childNode)
 		}
@@ -279,16 +281,21 @@ func messageIDfromURL(urlComponent string) messageID {
 // from the node the hash ID of which matches the given one.  The reason is
 // that when displaying the thread in the browser, the current email should not
 // be hyperlinked.
-func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode) *threadNode {
+func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode, tokenFull string) *threadNode {
 	if thread.MessageID == "" || thread.MessageID == messageID {
 		thread.Link = ""
-	} else if hashMessageID(thread.MessageID, "") == originHashID {
-		thread.Link = template.URL(originHashID)
 	} else {
-		thread.Link = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(thread.MessageID)))
+		if hashMessageID(thread.MessageID, "") == originHashID {
+			thread.Link = template.URL(originHashID)
+		} else {
+			thread.Link = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(thread.MessageID)))
+		}
+		if tokenFull != "" {
+			thread.Link += template.URL("?tokenFull=" + tokenFull)
+		}
 	}
 	for _, child := range thread.Children {
-		finalizeThread(messageID, originHashID, child)
+		finalizeThread(messageID, originHashID, child, tokenFull)
 	}
 	return thread
 }
@@ -319,7 +326,8 @@ func readMail(mailPath string) (message *enmime.Envelope, threadRoot hashID, err
 // message object, and thread root ID for the *origin* mail, i.e. the one given
 // in the hash component of the URL (in contrast to the optional message ID
 // component).  It may trigger an HTTP 404 if the mail file was not found.
-func readOriginMail(controller *web.Controller) (hashID hashID, message *enmime.Envelope, threadRoot hashID) {
+func readOriginMail(controller *web.Controller) (
+	hashID hashID, message *enmime.Envelope, threadRoot hashID, messageID messageID, full bool) {
 	hashID = typeHashID(controller.Ctx.Input.Param(":hash"))
 	mailPathsLock.RLock()
 	mailPath := mailPaths[hashID]
@@ -328,25 +336,33 @@ func readOriginMail(controller *web.Controller) (hashID hashID, message *enmime.
 	if err != nil {
 		controller.Abort("404")
 	}
+	messageID = extractMessageID(message.GetHeader("Message-ID"))
+	tokenFull := controller.GetString("tokenFull")
+	if tokenFull != "" {
+		if tokenFull != string(hashMessageID(messageID, "full")) {
+			controller.Abort("403")
+		} else {
+			full = true
+		}
+	}
 	return
 }
 
 // getMailAndThreadRoot encapsulates common code used in some controllers.  It
 // returns data for both the concrete (given by the message ID in the URL) and
 // the original mail (given by the hash in the URL).  It checks for validity of
-// the URL (in particular, whether the message ID is allowed to be retreived)
-// and may trigger HTTP 4… errors.
+// the URL (in particular, whether the message ID is allowed to be retreived
+// and whether a tokenFull is valid) and may trigger HTTP 4… errors.
 func getMailAndThreadRoot(controller *web.Controller) (
-	messageID messageID, hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
+	full bool, messageID messageID, hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
 	messageID = messageIDfromURL(controller.Ctx.Input.Param(":messageid"))
 	if messageID == "" {
-		hashID, message, threadRoot = readOriginMail(controller)
+		hashID, message, threadRoot, messageID, full = readOriginMail(controller)
 		originHashID = hashID
-		messageID = extractMessageID(message.GetHeader("Message-ID"))
 		controller.Data["link"] = template.URL(hashID)
 	} else {
 		var originThreadRoot typeHashID
-		originHashID, _, originThreadRoot = readOriginMail(controller)
+		originHashID, _, originThreadRoot, _, full = readOriginMail(controller)
 		hashID = messageIDToHashID(messageID)
 		mailPathsLock.RLock()
 		mailPath := mailPaths[hashID]
@@ -361,12 +377,14 @@ func getMailAndThreadRoot(controller *web.Controller) (
 				messageID, originHashID, originThreadRoot, threadRoot)
 			controller.Abort("403")
 		}
-		timestampsLock.RLock()
-		after := timestamps[hashID].After(timestamps[originHashID])
-		timestampsLock.RUnlock()
-		if after {
-			logger.Printf("Denied access because message %v is too new\n", messageID)
-			controller.Abort("403")
+		if !full {
+			timestampsLock.RLock()
+			after := timestamps[hashID].After(timestamps[originHashID])
+			timestampsLock.RUnlock()
+			if after {
+				logger.Printf("Denied access because message %v is too new\n", messageID)
+				controller.Abort("403")
+			}
 		}
 		controller.Data["link"] = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(messageID)))
 	}
@@ -387,9 +405,10 @@ type MainController struct {
 
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
-	messageID, hashID, threadRoot, originHashID, message := getMailAndThreadRoot(&this.Controller)
+	full, messageID, hashID, threadRoot, originHashID, message := getMailAndThreadRoot(&this.Controller)
 	if threadRoot != "" {
-		this.Data["thread"] = finalizeThread(messageID, originHashID, buildThread(threadRoot, originHashID))
+		this.Data["thread"] = finalizeThread(
+			messageID, originHashID, buildThread(threadRoot, originHashID, full), this.GetString("tokenFull"))
 	}
 	this.TplName = "index.tpl"
 	this.Data["rooturl"] = rootURL
@@ -418,7 +437,7 @@ type AttachmentController struct {
 
 // Controller for downloading mail attachments.
 func (this *AttachmentController) Get() {
-	_, _, _, _, message := getMailAndThreadRoot(&this.Controller)
+	_, _, _, _, _, message := getMailAndThreadRoot(&this.Controller)
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
 	this.Ctx.Output.Header("Content-Disposition",
@@ -495,7 +514,7 @@ func (this *SendController) Get() {
 	if emailAddress == "" {
 		logger.Panicf("email address of %v not found", loginName)
 	}
-	_, hashID, _, _, _ := getMailAndThreadRoot(&this.Controller)
+	_, _, hashID, _, _, _ := getMailAndThreadRoot(&this.Controller)
 	mailBody := filterHeaders(hashID)
 	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
 		[]string{emailAddress}, mailBody)
