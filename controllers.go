@@ -315,7 +315,7 @@ func readMail(mailPath string) (message *enmime.Envelope, threadRoot hashID, err
 	return
 }
 
-// readOriginMail is a helper for getMailAndThread.  It returns hash ID,
+// readOriginMail is a helper for getMailAndThreadRoot.  It returns hash ID,
 // message object, and thread root ID for the *origin* mail, i.e. the one given
 // in the hash component of the URL (in contrast to the optional message ID
 // component).  It may trigger an HTTP 404 if the mail file was not found.
@@ -331,12 +331,12 @@ func readOriginMail(controller *web.Controller) (hashID hashID, message *enmime.
 	return
 }
 
-// getMailAndThread encapsulates common code used in some controllers.  It
+// getMailAndThreadRoot encapsulates common code used in some controllers.  It
 // returns data for both the concrete (given by the message ID in the URL) and
 // the original mail (given by the hash in the URL).  It checks for validity of
 // the URL (in particular, whether the message ID is allowed to be retreived)
 // and may trigger HTTP 4… errors.
-func getMailAndThread(controller *web.Controller) (
+func getMailAndThreadRoot(controller *web.Controller) (
 	messageID messageID, hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
 	messageID = messageIDfromURL(controller.Ctx.Input.Param(":messageid"))
 	if messageID == "" {
@@ -387,7 +387,7 @@ type MainController struct {
 
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
-	messageID, hashID, threadRoot, originHashID, message := getMailAndThread(&this.Controller)
+	messageID, hashID, threadRoot, originHashID, message := getMailAndThreadRoot(&this.Controller)
 	if threadRoot != "" {
 		this.Data["thread"] = finalizeThread(messageID, originHashID, buildThread(threadRoot, originHashID))
 	}
@@ -418,7 +418,7 @@ type AttachmentController struct {
 
 // Controller for downloading mail attachments.
 func (this *AttachmentController) Get() {
-	_, _, _, _, message := getMailAndThread(&this.Controller)
+	_, _, _, _, message := getMailAndThreadRoot(&this.Controller)
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
 	this.Ctx.Output.Header("Content-Disposition",
@@ -495,7 +495,7 @@ func (this *SendController) Get() {
 	if emailAddress == "" {
 		logger.Panicf("email address of %v not found", loginName)
 	}
-	_, hashID, _, _, _ := getMailAndThread(&this.Controller)
+	_, hashID, _, _, _ := getMailAndThreadRoot(&this.Controller)
 	mailBody := filterHeaders(hashID)
 	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
 		[]string{emailAddress}, mailBody)
