@@ -407,6 +407,9 @@ type MainController struct {
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
 	tokenFull, messageID, hashID, threadRoot, originHashID, message := getMailAndThreadRoot(&this.Controller)
+	if tokenFull != "" {
+		this.Data["queryString"] = template.URL("?tokenFull=" + tokenFull)
+	}
 	if threadRoot != "" {
 		this.Data["thread"] = finalizeThread(
 			messageID, originHashID, buildThread(threadRoot, originHashID, tokenFull != ""), tokenFull)

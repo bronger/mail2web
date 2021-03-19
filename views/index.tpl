@@ -55,7 +55,7 @@
 {{if .attachments}}
 <h2>Attachments</h2>
 {{range $i, $name := .attachments}}
-<p><a href="{{$.rooturl}}/{{$.link}}/{{$i}}">{{$name}}</a></p>
+<p><a href="{{$.rooturl}}/{{$.link}}/{{$i}}{{$.queryString}}">{{$name}}</a></p>
 {{end}}
 {{end}}
 </body>
