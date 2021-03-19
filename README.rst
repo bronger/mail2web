@@ -140,5 +140,6 @@ Getting the URLs
 ================
 
 In order to get the URL to a mail as the owner of the mails, call
-``mail2hash.py`` and pass the path to the respective mail file.  You must edit
-its source code, however, and adapt the ``root_url`` and ``pepper`` variables.
+``mail2hash.py`` and pass the path to the respective mail file.  The scripts
+uses the environment variables ``ROOT_URL`` and ``SECRET_KEY_PATH``.
+Additionally, it needs ``DOMAIN`` to be set to e.g. “mails.example.com”.

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import sys, email.parser, hashlib, base64
+import sys, email.parser, hashlib, base64, os
 
 
-url_root = "https://mails.example.com/"
-pepper = ""
+url_root = "https://{}{}/".format(os.environ["DOMAIN"], os.environ.get("ROOT_URL", ""))
+pepper = open(os.environ.get("SECRET_KEY_PATH", "/var/lib/mail2web_secrets/secret_key")).read().strip()
 
 
 def hash_id(message_id, salt=""):
