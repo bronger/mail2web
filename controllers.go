@@ -378,7 +378,7 @@ func getMailAndThreadRoot(controller *web.Controller) (
 				messageID, originHashID, originThreadRoot, threadRoot)
 			controller.Abort("403")
 		}
-		if tokenFull != "" {
+		if tokenFull == "" {
 			timestampsLock.RLock()
 			after := timestamps[hashID].After(timestamps[originHashID])
 			timestampsLock.RUnlock()
