@@ -6,6 +6,8 @@ RFC 5322 files.  This way, you can give your mails persistent identifiers while
 at the same time you are able to show them – along with their thread and
 attachments – to others.
 
+As an example, visit https://mails.bronger.org/zkoL7KUVtt.
+
 
 Security
 ========
