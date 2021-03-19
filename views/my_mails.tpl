@@ -10,7 +10,7 @@
 <body>
 <h1>Your mails</h1>
 
-<p>All your mails of the last 30 days were sent to {{.address}} as a CSV file.</p>
+<p>The following table shows all your mails of the last 30 days.</p>
 <p>This includes mails where the mail address(es) {{.addresses}} occur(s) in
   “<samp>From:</samp>”, “<samp>To:</samp>”, “<samp>Cc:</samp>”, or
   “<samp>Bcc:</samp>”.</p>
