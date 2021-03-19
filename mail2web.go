@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"html/template"
 	"io/fs"
 	"log"
 	"net/mail"
@@ -72,6 +74,13 @@ type mailInfo struct {
 	From, Subject string
 	Timestamp     time.Time
 	references    map[hashID]bool
+}
+
+// FullThreadLink returns the absolute link to the mail in full-thread mode.
+// It is exported because it is needed in the views (templates).
+func (mailInfo mailInfo) FullThreadLink() template.URL {
+	return template.URL(fmt.Sprintf(
+		"%v/%v?tokenFull=%v", rootURL, mailInfo.HashID, hashMessageID(mailInfo.MessageID, "full")))
 }
 
 // This struct is passed through the channel “updates” to a central goroutine

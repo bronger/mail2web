@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
+	"io/ioutil"
 	"mime"
 	"net/mail"
 	"net/smtp"
@@ -17,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/beego/beego/v2/server/web"
@@ -26,6 +28,8 @@ import (
 )
 
 type typeHashID = hashID
+
+var requestMailTemplate *textTemplate.Template
 
 func check(e error) {
 	if e != nil {
@@ -554,6 +558,76 @@ func (this *MyMailsController) Get() {
 	this.Data["rooturl"] = rootURL
 }
 
+type MailRequestController struct {
+	web.Controller
+}
+
+// Controller for requesting the hash of a certain email.
+func (this *MailRequestController) Get() {
+	loginName := getLogin(this.Ctx.Input.Header("Authorization"))
+	emailAddress := getEmailAddress(loginName)
+	if emailAddress == "" {
+		logger.Panicf("email address of %v not found", loginName)
+	}
+	messageID := messageIDfromURL(this.Ctx.Input.Param(":messageid"))
+	hashID := messageIDToHashID(messageID)
+	mailPathsLock.RLock()
+	mailPath := mailPaths[hashID]
+	mailPathsLock.RUnlock()
+	if mailPath == "" {
+		this.Abort("404")
+	}
+	file, err := os.Open(mailPath)
+	check(err)
+	defer func() {
+		err := file.Close()
+		check(err)
+	}()
+	message, err := mail.ReadMessage(file)
+	if err != nil {
+		logger.Println(err)
+		this.Abort("404")
+	}
+	matches := emailRegex.FindAllStringSubmatch(message.Header.Get("From"), -1)
+	matches = append(matches, emailRegex.FindAllStringSubmatch(message.Header.Get("To"), -1)...)
+	matches = append(matches, emailRegex.FindAllStringSubmatch(message.Header.Get("Cc"), -1)...)
+	matches = append(matches, emailRegex.FindAllStringSubmatch(message.Header.Get("Bcc"), -1)...)
+	addresses := make(map[string]bool)
+	for _, match := range matches {
+		addresses[strings.ToLower(match[0])] = true
+	}
+	var found bool
+	for _, address := range permissions.Addresses[loginName] {
+		if addresses[address] {
+			found = true
+			break
+		}
+	}
+	if !found {
+		this.Abort("403")
+	}
+	adminMails := permissions.Addresses[permissions.Admin]
+	if len(adminMails) == 0 {
+		this.Abort("500")
+	}
+	adminMail := adminMails[0]
+	link := fmt.Sprintf("%v/%v", rootURL, hashID)
+	fullThreadLink := fmt.Sprintf("%v?tokenFull=%v", link, string(hashMessageID(messageID, "full")))
+	mailContent := new(bytes.Buffer)
+	err = requestMailTemplate.Execute(mailContent, map[string]string{
+		"loginName": loginName, "link": link, "fullThreadLink": fullThreadLink})
+	check(err)
+	err = enmime.Builder().
+		From("", adminMail).
+		Subject("Request for hash ID for mail "+loginName).
+		ReplyTo("", emailAddress).
+		Text(mailContent.Bytes()).
+		To("", adminMail).Send("postfix:587", nil)
+	check(err)
+	this.TplName = "mailRequest.tpl"
+	this.Data["messageid"] = messageID
+}
+
 type HealthController struct {
 	web.Controller
 }
@@ -562,4 +636,10 @@ type HealthController struct {
 func (this *HealthController) Get() {
 	err := this.Ctx.Output.Body([]byte{})
 	check(err)
+}
+
+func init() {
+	templateContent, err := ioutil.ReadFile("requestMail.tpl")
+	check(err)
+	requestMailTemplate = textTemplate.Must(textTemplate.New("mail").Parse(string(templateContent)))
 }

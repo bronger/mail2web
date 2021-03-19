@@ -33,9 +33,6 @@ Known weaknesses
    same topic, and mails with ealier timestamps should not arrive later.
    Still, this means that newly arrived mails may become immediately
    accessible.
-2. If you grant certain users access their “my mails” page, they get access to
-   all mails that share the same thread as mail sent to them, up to the
-   timestamp of the mail sent to them.
 
 
 Server setup
@@ -113,6 +110,8 @@ that might log in like so:
 
 .. code-block:: yaml
 
+    admin: username1
+
     addresses:
       username1:
         - user1@example.com
@@ -129,6 +128,10 @@ The respectively first mail address is the primary personal address of that
 user, which is used to send mails to them.  The other mail addresses belong to
 mail boxes the user can read, too.  They are used to compile the mails for the
 user in the “my mails” page.
+
+The user name set in ``admin`` must point to a user name in ``addresses`` with
+at least one mail address.  Otherwise, requesting mails in the “my mails” page
+does not work.
 
 
 Getting the URLs
