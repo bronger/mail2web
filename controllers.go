@@ -329,7 +329,8 @@ func readMail(mailPath string) (message *enmime.Envelope, threadRoot hashID, err
 // readOriginMail is a helper for getMailAndThreadRoot.  It returns hash ID,
 // message object, and thread root ID for the *origin* mail, i.e. the one given
 // in the hash component of the URL (in contrast to the optional message ID
-// component).  It may trigger an HTTP 404 if the mail file was not found.
+// component).  It may trigger an HTTP 404 if the mail file was not found, and
+// an HTTP 403 if a tokenFull is given but invalid.
 func readOriginMail(controller *web.Controller) (
 	hashID hashID, message *enmime.Envelope, threadRoot hashID, messageID messageID, tokenFull string) {
 	hashID = typeHashID(controller.Ctx.Input.Param(":hash"))
