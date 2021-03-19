@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import sys, email.parser, hashlib, base64
-import yaml
 
 
 url_root = "https://mails.example.com/"
