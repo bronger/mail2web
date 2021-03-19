@@ -25,7 +25,7 @@
       <td><a href="{{.FullThreadLink}}">{{.Timestamp}}</a></td>
       <td>{{.From}}</td>
       <td>{{.Subject}}</td>
-      <td>{{.MessageID}}</td>
+      <td style="overflow-wrap: break-word; max-width: 20em">{{.MessageID}}</td>
     </tr>
     {{end}}
   </tbody>
