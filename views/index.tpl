@@ -44,7 +44,7 @@
 </table>
 <hr>
 {{if .html}}
-<div style="max-width: 40em">
+<div style="max-width: 40em; margin-left: 18pt">
 {{.html}}
 </div>
 {{else}}
