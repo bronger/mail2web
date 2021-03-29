@@ -301,9 +301,14 @@ func setUpWatcher() {
 		for {
 			select {
 			case event := <-watcher.Events:
-				if event.Op&fsnotify.Create == fsnotify.Create {
+				if event.Op&fsnotify.Create == fsnotify.Create ||
+					event.Op&fsnotify.Create == fsnotify.Write {
 					if update := processMail(event.Name); update.HashID != "" {
-						logger.Println("WATCHER: created file:", event.Name)
+						if event.Op&fsnotify.Create == fsnotify.Create {
+							logger.Println("WATCHER: created file:", event.Name)
+						} else {
+							logger.Println("WATCHER: wrote (updated) file:", event.Name)
+						}
 						mailPathsLock.Lock()
 						mailPaths[update.HashID] = event.Name
 						mailPathsLock.Unlock()
