@@ -302,7 +302,7 @@ func setUpWatcher() {
 			select {
 			case event := <-watcher.Events:
 				if event.Op&fsnotify.Create == fsnotify.Create ||
-					event.Op&fsnotify.Create == fsnotify.Write {
+					event.Op&fsnotify.Write == fsnotify.Write {
 					if update := processMail(event.Name); update.HashID != "" {
 						if event.Op&fsnotify.Create == fsnotify.Create {
 							logger.Println("WATCHER: created file:", event.Name)
