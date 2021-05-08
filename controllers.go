@@ -304,13 +304,9 @@ func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode
 	return thread
 }
 
-// readMail reads an RFC 5322 file and returns it as a mail object.
-// Furthermore, it traces back all back references to get the root of the
-// thread this mail belongs to.  This root may not be part of the mail archive
-// but just be given by its hashed message ID.  (“Fake root”)
-//
-// The returned error is non-nil only if the mail file could not be found.
-func readMail(mailPath string) (message *enmime.Envelope, threadRoot hashID, err error) {
+// readMail reads an RFC 5322 file and returns it as a mail object.  The
+// returned error is non-nil only if the mail file could not be found.
+func readMail(mailPath string) (message *enmime.Envelope, err error) {
 	file, err := os.Open(mailPath)
 	if errors.Is(err, fs.ErrNotExist) {
 		return
@@ -322,7 +318,6 @@ func readMail(mailPath string) (message *enmime.Envelope, threadRoot hashID, err
 	}()
 	message, err = enmime.ReadEnvelope(file)
 	check(err)
-	threadRoot = findThreadRoot(message)
 	return
 }
 
@@ -337,10 +332,11 @@ func readOriginMail(controller *web.Controller) (
 	mailPathsLock.RLock()
 	mailPath := mailPaths[hashID]
 	mailPathsLock.RUnlock()
-	message, threadRoot, err := readMail(mailPath)
+	message, err := readMail(mailPath)
 	if err != nil {
 		controller.Abort("404")
 	}
+	threadRoot = findThreadRoot(message)
 	messageID = extractMessageID(message.GetHeader("Message-ID"))
 	tokenFull = controller.GetString("tokenFull")
 	if tokenFull != "" && tokenFull != string(hashMessageID(messageID, "full")) {
@@ -369,10 +365,11 @@ func getMailAndThreadRoot(controller *web.Controller) (
 		mailPath := mailPaths[hashID]
 		mailPathsLock.RUnlock()
 		var err error
-		message, threadRoot, err = readMail(mailPath)
+		message, err = readMail(mailPath)
 		if err != nil {
 			controller.Abort("404")
 		}
+		threadRoot = findThreadRoot(message)
 		if originThreadRoot != threadRoot {
 			logger.Printf("Denied access because message ID %v and hash ID %v are different threads: %v, %v",
 				messageID, originHashID, originThreadRoot, threadRoot)
