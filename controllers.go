@@ -353,6 +353,9 @@ func readOriginMail(controller *web.Controller) (
 		token = controller.GetString("token" + strings.Title(name))
 		if token != "" {
 			if token != string(hashMessageID(messageID, name)) {
+				logger.Printf(
+					"Denied access because token %v is invalid for message ID %v and access mode %v",
+					token, messageID, name)
 				controller.Abort("403")
 			}
 			return true
@@ -386,6 +389,7 @@ func getMailAndThreadRoot(controller *web.Controller) (accessMode int, token str
 		controller.Data["link"] = template.URL(hashID)
 	} else {
 		if accessMode == accessSingle {
+			logger.Println("Denied access because message ID parameter is forbidden for single access mode")
 			controller.Abort("403")
 		}
 		var originThreadRoot typeHashID
@@ -445,6 +449,7 @@ func (this *MainController) Get() {
 	if threadRoot != "" {
 		thread, originIncluded := buildThread(threadRoot, originHashID, accessMode)
 		if !originIncluded {
+			logger.Printf("Denied access because selected mail %v is not included in allowed thread", messageID)
 			this.Abort("403")
 		}
 		this.Data["thread"] = finalizeThread(messageID, originHashID, thread, queryString)
