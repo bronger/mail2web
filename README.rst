@@ -6,7 +6,8 @@ RFC 5322 files.  This way, you can give your mails persistent identifiers while
 at the same time you are able to show them – along with their thread and
 attachments – to others.
 
-As an example, visit https://mails.bronger.org/zkoL7KUVtt.
+As an example, visit
+https://mails.bronger.org/zkoL7KUVtt?tokenOlder=AzE6Xw8ETg.
 
 
 Security
@@ -17,24 +18,29 @@ achieved by addressing all mail using a peppered hash like this::
 
   https://mymails.example.com/87g46e5i78
 
-Let us call the mail addressed by this link the *origin mail*.  The link also
-exposes the thread associated with the origin mail to everyone that has that
-link, but only those mails that are older than the origin mail.  (Unless you
-pass the right ``tokenFull`` in the query string.)
-
 The hash is base64-URL-encoded with 10 characters, so it has :math:`2^{60}`
 possible values.  If you have e.g. :math:`2^{17}` ≈ 130,000 mails, attackers
 will have a hit each 8,796,093,022,208 tries, on average.
 
+Let us call the mail addressed by this link the *origin mail*.  Depending on a
+``token…`` parameter in the query string of the URL, the link also exposes the
+thread associated with the origin mail to everyone that has that link.
 
-Known weaknesses
-----------------
+There are four access modes:
 
-1. If a new mail arrives with a timestamp older than the origin mail, it is
-   also exposed by the link to the origin mail.  The mail should belong to the
-   same topic, and mails with ealier timestamps should not arrive later.
-   Still, this means that newly arrived mails may become immediately
-   accessible.
+single
+  shows only one single mail, denoted by the hash.
+
+direct
+  shows the mail with all its direct ancestors.  In other words, a single
+  direct line in the thread to the mail.
+
+older
+  shows the mail plus all other mails in the thread that are older than it.
+  This is like “direct” but with side branches in the thread.
+
+full
+  shows the full thread, including mails that are yet to come to it.
 
 
 Server setup
@@ -142,4 +148,5 @@ Getting the URLs
 In order to get the URL to a mail as the owner of the mails, call
 ``mail2hash.py`` and pass the path to the respective mail file.  The scripts
 uses the environment variables ``ROOT_URL`` and ``SECRET_KEY_PATH``.
-Additionally, it needs ``DOMAIN`` to be set to e.g. “mails.example.com”.
+Additionally, it needs ``DOMAIN`` to be set to e.g. “mails.example.com”.  For
+further information, call ``mail2hash.py --help``.
