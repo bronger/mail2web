@@ -5,7 +5,8 @@ import sys, email.parser, hashlib, base64, os, argparse
 
 parser = argparse.ArgumentParser(description="Calculating links to mails.")
 parser.add_argument("path", help="absolute path to the mail file")
-parser.add_argument("--access", choices=("full",), help="Mode of access.  Defaults to all thread mails which are older.")
+parser.add_argument("--access", choices=("direct", "older", "full"),
+                    help="Mode of access.  Defaults to all thread mails which are older.")
 args = parser.parse_args()
 
 

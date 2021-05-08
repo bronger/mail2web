@@ -31,6 +31,13 @@ type typeHashID = hashID
 
 var requestMailTemplate *textTemplate.Template
 
+const (
+	accessSingle = iota
+	accessDirect
+	accessOlder
+	accessFull
+)
+
 func check(e error) {
 	if e != nil {
 		logger.Panic(e)
@@ -221,7 +228,8 @@ func threadNodeByHashID(hashID hashID) *threadNode {
 
 // buildThread returns the thread to the given root hash ID as a nested
 // structure of threadNode’s.
-func buildThread(root, originHashID hashID, full bool) (rootNode *threadNode) {
+func buildThread(root, originHashID hashID, accessMode int) (rootNode *threadNode, originIncluded bool) {
+	originIncluded = root == originHashID
 	rootNode = threadNodeByHashID(root)
 	childrenLock.RLock()
 	root_children := children[root]
@@ -231,7 +239,7 @@ func buildThread(root, originHashID hashID, full bool) (rootNode *threadNode) {
 		children[child] = true
 	}
 	for child, _ := range root_children {
-		if !full {
+		if accessMode != accessFull {
 			timestampsLock.RLock()
 			after := timestamps[child].After(timestamps[originHashID])
 			timestampsLock.RUnlock()
@@ -249,10 +257,14 @@ func buildThread(root, originHashID hashID, full bool) (rootNode *threadNode) {
 		if grandChild {
 			continue
 		}
-		childNode := buildThread(child, originHashID, full)
+		childNode, originIncludedInChild := buildThread(child, originHashID, accessMode)
 		if childNode != nil {
+			originIncluded = originIncluded || originIncludedInChild
 			rootNode.Children = append(rootNode.Children, childNode)
 		}
+	}
+	if accessMode == accessDirect && len(rootNode.Children) == 0 && root != originHashID {
+		return nil, false
 	}
 	sort.SliceStable(rootNode.Children, func(i, j int) bool {
 		hashID_i := messageIDToHashID(rootNode.Children[i].MessageID)
@@ -285,7 +297,7 @@ func messageIDfromURL(urlComponent string) messageID {
 // from the node the hash ID of which matches the given one.  The reason is
 // that when displaying the thread in the browser, the current email should not
 // be hyperlinked.
-func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode, tokenFull string) *threadNode {
+func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode, queryString template.URL) *threadNode {
 	if thread.MessageID == "" || thread.MessageID == messageID {
 		thread.Link = ""
 	} else {
@@ -294,12 +306,10 @@ func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode
 		} else {
 			thread.Link = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(thread.MessageID)))
 		}
-		if tokenFull != "" {
-			thread.Link += template.URL("?tokenFull=" + tokenFull)
-		}
+		thread.Link += queryString
 	}
 	for _, child := range thread.Children {
-		finalizeThread(messageID, originHashID, child, tokenFull)
+		finalizeThread(messageID, originHashID, child, queryString)
 	}
 	return thread
 }
@@ -322,12 +332,13 @@ func readMail(mailPath string) (message *enmime.Envelope, err error) {
 }
 
 // readOriginMail is a helper for getMailAndThreadRoot.  It returns hash ID,
-// message object, and thread root ID for the *origin* mail, i.e. the one given
-// in the hash component of the URL (in contrast to the optional message ID
-// component).  It may trigger an HTTP 404 if the mail file was not found, and
-// an HTTP 403 if a tokenFull is given but invalid.
+// message object, thread root ID, access mode (only one mail, whole thread
+// etc.) and token for the *origin* mail, i.e. the one given in the hash
+// component of the URL (in contrast to the optional message ID component).  It
+// may trigger an HTTP 404 if the mail file was not found, and an HTTP 403 if a
+// tokenFull is given but invalid.
 func readOriginMail(controller *web.Controller) (
-	hashID hashID, message *enmime.Envelope, threadRoot hashID, messageID messageID, tokenFull string) {
+	hashID hashID, message *enmime.Envelope, threadRoot hashID, messageID messageID, accessMode int, token string) {
 	hashID = typeHashID(controller.Ctx.Input.Param(":hash"))
 	mailPathsLock.RLock()
 	mailPath := mailPaths[hashID]
@@ -336,30 +347,49 @@ func readOriginMail(controller *web.Controller) (
 	if err != nil {
 		controller.Abort("404")
 	}
-	threadRoot = findThreadRoot(message)
 	messageID = extractMessageID(message.GetHeader("Message-ID"))
-	tokenFull = controller.GetString("tokenFull")
-	if tokenFull != "" && tokenFull != string(hashMessageID(messageID, "full")) {
-		controller.Abort("403")
+	accessMode = accessSingle
+	scanForToken := func(name string) bool {
+		token = controller.GetString("token" + strings.Title(name))
+		if token != "" {
+			if token != string(hashMessageID(messageID, name)) {
+				controller.Abort("403")
+			}
+			return true
+		}
+		return false
+	}
+	switch true {
+	case scanForToken("direct"):
+		accessMode = accessDirect
+	case scanForToken("older"):
+		accessMode = accessOlder
+	case scanForToken("full"):
+		accessMode = accessFull
+	}
+	if accessMode != accessSingle {
+		threadRoot = findThreadRoot(message)
 	}
 	return
 }
 
 // getMailAndThreadRoot encapsulates common code used in some controllers.  It
 // returns data for both the concrete (given by the message ID in the URL) and
-// the original mail (given by the hash in the URL).  It checks for validity of
-// the URL (in particular, whether the message ID is allowed to be retreived
-// and whether a tokenFull is valid) and may trigger HTTP 4… errors.
-func getMailAndThreadRoot(controller *web.Controller) (
-	tokenFull string, messageID messageID, hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
+// the original mail (given by the hash in the URL).  It checks whether a token
+// – if given – is valid and may trigger HTTP 4… errors.
+func getMailAndThreadRoot(controller *web.Controller) (accessMode int, token string, messageID messageID,
+	hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
 	messageID = messageIDfromURL(controller.Ctx.Input.Param(":messageid"))
 	if messageID == "" {
-		hashID, message, threadRoot, messageID, tokenFull = readOriginMail(controller)
+		hashID, message, threadRoot, messageID, accessMode, token = readOriginMail(controller)
 		originHashID = hashID
 		controller.Data["link"] = template.URL(hashID)
 	} else {
+		if accessMode == accessSingle {
+			controller.Abort("403")
+		}
 		var originThreadRoot typeHashID
-		originHashID, _, originThreadRoot, _, tokenFull = readOriginMail(controller)
+		originHashID, _, originThreadRoot, _, accessMode, token = readOriginMail(controller)
 		hashID = messageIDToHashID(messageID)
 		mailPathsLock.RLock()
 		mailPath := mailPaths[hashID]
@@ -369,18 +399,12 @@ func getMailAndThreadRoot(controller *web.Controller) (
 		if err != nil {
 			controller.Abort("404")
 		}
-		threadRoot = findThreadRoot(message)
-		if originThreadRoot != threadRoot {
-			logger.Printf("Denied access because message ID %v and hash ID %v are different threads: %v, %v",
-				messageID, originHashID, originThreadRoot, threadRoot)
-			controller.Abort("403")
-		}
-		if tokenFull == "" {
-			timestampsLock.RLock()
-			after := timestamps[hashID].After(timestamps[originHashID])
-			timestampsLock.RUnlock()
-			if after {
-				logger.Printf("Denied access because message %v is too new\n", messageID)
+		if accessMode != accessSingle {
+			threadRoot = findThreadRoot(message)
+			if originThreadRoot != threadRoot {
+				logger.Printf(
+					"Denied access because message ID %v and hash ID %v are different threads: %v, %v",
+					messageID, originHashID, originThreadRoot, threadRoot)
 				controller.Abort("403")
 			}
 		}
@@ -403,13 +427,27 @@ type MainController struct {
 
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
-	tokenFull, messageID, hashID, threadRoot, originHashID, message := getMailAndThreadRoot(&this.Controller)
-	if tokenFull != "" {
-		this.Data["queryString"] = template.URL("?tokenFull=" + tokenFull)
+	accessMode, token, messageID, hashID, threadRoot, originHashID, message := getMailAndThreadRoot(&this.Controller)
+	var queryString template.URL
+	if accessMode != accessSingle {
+		var key string
+		switch accessMode {
+		case accessDirect:
+			key = "tokenDirect"
+		case accessOlder:
+			key = "tokenOlder"
+		case accessFull:
+			key = "tokenFull"
+		}
+		queryString = template.URL("?" + key + "=" + token)
+		this.Data["queryString"] = queryString
 	}
 	if threadRoot != "" {
-		this.Data["thread"] = finalizeThread(
-			messageID, originHashID, buildThread(threadRoot, originHashID, tokenFull != ""), tokenFull)
+		thread, originIncluded := buildThread(threadRoot, originHashID, accessMode)
+		if !originIncluded {
+			this.Abort("403")
+		}
+		this.Data["thread"] = finalizeThread(messageID, originHashID, thread, queryString)
 	}
 	this.TplName = "index.tpl"
 	this.Data["rooturl"] = rootURL
@@ -438,7 +476,7 @@ type AttachmentController struct {
 
 // Controller for downloading mail attachments.
 func (this *AttachmentController) Get() {
-	_, _, _, _, _, message := getMailAndThreadRoot(&this.Controller)
+	_, _, _, _, _, _, message := getMailAndThreadRoot(&this.Controller)
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
 	this.Ctx.Output.Header("Content-Disposition",
@@ -515,7 +553,7 @@ func (this *SendController) Get() {
 	if emailAddress == "" {
 		logger.Panicf("email address of %v not found", loginName)
 	}
-	_, _, hashID, _, _, _ := getMailAndThreadRoot(&this.Controller)
+	_, _, _, hashID, _, _, _ := getMailAndThreadRoot(&this.Controller)
 	mailBody := filterHeaders(hashID)
 	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
 		[]string{emailAddress}, mailBody)
