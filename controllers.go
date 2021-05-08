@@ -388,12 +388,12 @@ func getMailAndThreadRoot(controller *web.Controller) (accessMode int, token str
 		originHashID = hashID
 		controller.Data["link"] = template.URL(hashID)
 	} else {
+		var originThreadRoot typeHashID
+		originHashID, _, originThreadRoot, _, accessMode, token = readOriginMail(controller)
 		if accessMode == accessSingle {
 			logger.Println("Denied access because message ID parameter is forbidden for single access mode")
 			controller.Abort("403")
 		}
-		var originThreadRoot typeHashID
-		originHashID, _, originThreadRoot, _, accessMode, token = readOriginMail(controller)
 		hashID = messageIDToHashID(messageID)
 		mailPathsLock.RLock()
 		mailPath := mailPaths[hashID]
