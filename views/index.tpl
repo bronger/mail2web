@@ -37,6 +37,12 @@
     <th>To:</th>
     <td>{{.to}}</td>
   </tr>
+  {{if .cc}}
+  <tr>
+    <th>Cc:</th>
+    <td>{{.cc}}</td>
+  </tr>
+  {{end}}
   <tr>
     <th>Date:</th>
     <td>{{.date}}</td>

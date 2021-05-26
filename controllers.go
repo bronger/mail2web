@@ -459,6 +459,7 @@ func (this *MainController) Get() {
 	this.Data["from"] = message.GetHeader("From")
 	this.Data["subject"] = message.GetHeader("Subject")
 	this.Data["to"] = message.GetHeader("To")
+	this.Data["cc"] = message.GetHeader("Cc")
 	this.Data["date"] = message.GetHeader("Date")
 	this.Data["text"] = message.Text
 	mailPathsLock.RLock()
