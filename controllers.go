@@ -406,9 +406,19 @@ func getMailAndThreadRoot(controller *web.Controller) (accessMode int, token str
 		if accessMode != accessSingle {
 			threadRoot = findThreadRoot(message)
 			if originThreadRoot != threadRoot {
+				mailPathsLock.RLock()
+				originThreadRootPath := mailPaths[originThreadRoot]
+				threadRootPath := mailPaths[threadRoot]
+				mailPathsLock.RUnlock()
+				if originThreadRootPath == "" {
+					originThreadRootPath = "<invalid hash ID!>"
+				}
+				if threadRootPath == "" {
+					threadRootPath = "<invalid hash ID!>"
+				}
 				logger.Printf(
 					"Denied access because message ID %v and hash ID %v are different threads: %v, %v",
-					messageID, originHashID, originThreadRoot, threadRoot)
+					messageID, originHashID, originThreadRootPath, threadRootPath)
 				controller.Abort("403")
 			}
 		}
