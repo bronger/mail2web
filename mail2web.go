@@ -207,7 +207,7 @@ func processUpdates() {
 				delete(backReferences, update.HashID)
 				backReferencesLock.Unlock()
 				childrenLock.Lock()
-				for ancestor, _ := range formerBackReferences {
+				for ancestor := range formerBackReferences {
 					delete(children[ancestor], update.HashID)
 				}
 				childrenLock.Unlock()
@@ -219,7 +219,7 @@ func processUpdates() {
 			backReferencesLock.Lock()
 			backReferences[update.HashID] = update.references
 			backReferencesLock.Unlock()
-			for reference, _ := range update.references {
+			for reference := range update.references {
 				childrenLock.RLock()
 				_, ok := children[reference]
 				childrenLock.RUnlock()
@@ -253,7 +253,7 @@ func populateGlobalMaps() {
 					mailPathsLock.Unlock()
 					if time.Since(update.Timestamp) <= thirtyDays {
 						mailsByAddressLock.Lock()
-						for address, _ := range update.getAddresses() {
+						for address := range update.getAddresses() {
 							if mailsByAddress[address] == nil {
 								mailsByAddress[address] = make(map[hashID]mailInfo)
 							}
@@ -313,7 +313,7 @@ func setUpWatcher() {
 						mailPaths[update.HashID] = event.Name
 						mailPathsLock.Unlock()
 						mailsByAddressLock.Lock()
-						for address, _ := range update.getAddresses() {
+						for address := range update.getAddresses() {
 							if mailsByAddress[address] == nil {
 								mailsByAddress[address] = make(map[hashID]mailInfo)
 							}

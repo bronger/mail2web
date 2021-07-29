@@ -137,7 +137,7 @@ func findThreadRoot(m *enmime.Envelope) (root hashID) {
 		if len(references) == 0 {
 			return hashID, depth
 		}
-		for id, _ := range references {
+		for id := range references {
 			root_, rootDepth_ := stepBack(id, depth+1)
 			mailPathsLock.RLock()
 			root_Exists := mailPaths[root_] != ""
@@ -238,10 +238,10 @@ func buildThread(root, originHashID hashID, accessMode int) (rootNode *threadNod
 	root_children := children[root]
 	childrenLock.RUnlock()
 	children := make(map[hashID]bool)
-	for child, _ := range root_children {
+	for child := range root_children {
 		children[child] = true
 	}
-	for child, _ := range root_children {
+	for child := range root_children {
 		if accessMode != accessFull {
 			timestampsLock.RLock()
 			after := timestamps[child].After(timestamps[originHashID])
@@ -251,7 +251,7 @@ func buildThread(root, originHashID hashID, accessMode int) (rootNode *threadNod
 			}
 		}
 		grandChild := false
-		for backReference, _ := range backReferences[child] {
+		for backReference := range backReferences[child] {
 			if children[backReference] {
 				grandChild = true
 				break
