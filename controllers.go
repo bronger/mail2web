@@ -133,7 +133,9 @@ func findThreadRoot(m *enmime.Envelope) (root hashID) {
 		if depth > 100 {
 			return
 		}
+		backReferencesLock.RLock()
 		references := backReferences[hashID]
+		backReferencesLock.RUnlock()
 		if len(references) == 0 {
 			return hashID, depth
 		}
