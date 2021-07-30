@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	textTemplate "text/template"
 	"time"
 
@@ -173,6 +174,8 @@ func existingMail(hashID hashID) (existing bool) {
 	return
 }
 
+var cachedRoots sync.Map
+
 // findThreadRoot returns the hash ID of the root element of the thread the
 // given mail appears in.  If there is no thread, the hash ID of the given mail
 // is returned.  It returns the empty string if that hash ID cannot be
@@ -183,6 +186,9 @@ func findThreadRoot(m *enmime.Envelope) (root hashID) {
 		return ""
 	}
 	hashID := messageIDToHashID(messageID)
+	if raw, ok := cachedRoots.Load(hashID); ok {
+		return raw.(typeHashID)
+	}
 	nodes := collectThread(hashID)
 	visitedNodes := make(map[typeHashID]bool, len(nodes))
 	var threadSize int
@@ -229,7 +235,13 @@ func findThreadRoot(m *enmime.Envelope) (root hashID) {
 		}
 	}
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i] < candidates[j] })
-	return candidates[0]
+	root = candidates[0]
+	for node := range nodes {
+		if existingMail(node) {
+			cachedRoots.Store(node, root)
+		}
+	}
+	return root
 }
 
 // threadNode represents one mail in a nested thread.  All members are
