@@ -119,6 +119,60 @@ func extractMessageID(rawHeader string) messageID {
 	return messageID(match[1])
 }
 
+// collectThread returns the hash IDs of all mails in the thread the given hash
+// ID is part of.
+func collectThread(hashID hashID) (hashIDs map[hashID]bool) {
+	var flood func(typeHashID, map[typeHashID]bool)
+	flood = func(node typeHashID, visitedNodes map[typeHashID]bool) {
+		visitedNodes[node] = true
+		childrenLock.RLock()
+		for child := range children[node] {
+			if !visitedNodes[child] {
+				flood(child, visitedNodes)
+			}
+		}
+		childrenLock.RUnlock()
+		backReferencesLock.RLock()
+		for ancestor := range backReferences[node] {
+			if !visitedNodes[ancestor] {
+				flood(ancestor, visitedNodes)
+			}
+		}
+		backReferencesLock.RUnlock()
+	}
+	hashIDs = make(map[typeHashID]bool)
+	flood(hashID, hashIDs)
+	return
+}
+
+// collectSubthread returns the hash IDs of all mails in the thread the given
+// hash ID is root of.
+func collectSubthread(hashID hashID) (hashIDs map[hashID]bool) {
+	var flood func(typeHashID, map[typeHashID]bool)
+	flood = func(node typeHashID, visitedNodes map[typeHashID]bool) {
+		visitedNodes[node] = true
+		childrenLock.RLock()
+		for child := range children[node] {
+			if !visitedNodes[child] {
+				flood(child, visitedNodes)
+			}
+		}
+		childrenLock.RUnlock()
+	}
+	hashIDs = make(map[typeHashID]bool)
+	flood(hashID, hashIDs)
+	return
+}
+
+// existingMail returns whether the given mail exists on the filesystem or not.
+// If not, it is only found in the back references of existing mails.
+func existingMail(hashID hashID) (existing bool) {
+	mailPathsLock.RLock()
+	existing = mailPaths[hashID] != ""
+	mailPathsLock.RUnlock()
+	return
+}
+
 // findThreadRoot returns the hash ID of the root element of the thread the
 // given mail appears in.  If there is no thread, the hash ID of the given mail
 // is returned.  It returns the empty string if that hash ID cannot be
@@ -128,30 +182,54 @@ func findThreadRoot(m *enmime.Envelope) (root hashID) {
 	if messageID == "" {
 		return ""
 	}
-	var stepBack func(hashID, int) (hashID, int)
-	stepBack = func(hashID hashID, depth int) (root hashID, rootDepth int) {
-		if depth > 100 {
-			return
-		}
-		backReferencesLock.RLock()
-		references := backReferences[hashID]
-		backReferencesLock.RUnlock()
-		if len(references) == 0 {
-			return hashID, depth
-		}
-		for id := range references {
-			root_, rootDepth_ := stepBack(id, depth+1)
-			mailPathsLock.RLock()
-			root_Exists := mailPaths[root_] != ""
-			mailPathsLock.RUnlock()
-			if rootDepth_ > rootDepth || rootDepth_ == rootDepth && root_Exists && root_ > root {
-				root, rootDepth = root_, rootDepth_
+	hashID := messageIDToHashID(messageID)
+	nodes := collectThread(hashID)
+	visitedNodes := make(map[typeHashID]bool, len(nodes))
+	var threadSize int
+	var existingCandidates, nonexistingCandidates map[typeHashID]bool
+	for node := range nodes {
+		if !visitedNodes[node] {
+			nodeThread := collectSubthread(node)
+			for node_ := range nodeThread {
+				visitedNodes[node_] = true
+			}
+			nodeThreadSize := len(nodeThread)
+			if nodeThreadSize > threadSize {
+				threadSize = nodeThreadSize
+				existingCandidates = make(map[typeHashID]bool)
+				nonexistingCandidates = make(map[typeHashID]bool)
+				if existingMail(node) {
+					existingCandidates[node] = true
+				} else {
+					nonexistingCandidates[node] = true
+				}
+			} else if nodeThreadSize == threadSize {
+				if existingMail(node) {
+					existingCandidates[node] = true
+				} else {
+					nonexistingCandidates[node] = true
+				}
 			}
 		}
-		return
 	}
-	root, _ = stepBack(messageIDToHashID(messageID), 1)
-	return root
+	var candidates []typeHashID
+	if len(existingCandidates) > 0 {
+		for node := range existingCandidates {
+			candidates = append(candidates, node)
+		}
+		if len(candidates) != len(existingCandidates) {
+			logger.Panic("Duplicate found in existingCandidates")
+		}
+	} else {
+		for node := range nonexistingCandidates {
+			candidates = append(candidates, node)
+		}
+		if len(candidates) != len(nonexistingCandidates) {
+			logger.Panic("Duplicate found in nonexistingCandidates")
+		}
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i] < candidates[j] })
+	return candidates[0]
 }
 
 // threadNode represents one mail in a nested thread.  All members are
