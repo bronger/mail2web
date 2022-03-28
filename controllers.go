@@ -628,7 +628,10 @@ type ImageController struct {
 // getImage extracts an inline image from a mail.  It returns the image data,
 // content type, and – if there is one – a filename.
 func getImage(message *enmime.Envelope, cid string) ([]byte, string, string, error) {
-	for _, part := range message.Inlines {
+	var allParts []*enmime.Part
+	allParts = append(allParts, message.Inlines...)
+	allParts = append(allParts, message.OtherParts...)
+	for _, part := range allParts {
 		if part.ContentID != "" {
 			match := cidRegex.FindStringSubmatch(part.ContentID)
 			if len(match) == 2 {
