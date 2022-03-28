@@ -498,12 +498,12 @@ func readOriginMail(controller *web.Controller) (
 // the original mail (given by the hash in the URL).  It checks whether a token
 // – if given – is valid and may trigger HTTP 4… errors.
 func getMailAndThreadRoot(controller *web.Controller) (accessMode int, token string, messageID messageID,
-	hashID, threadRoot, originHashID hashID, message *enmime.Envelope) {
+	hashID, threadRoot, originHashID hashID, message *enmime.Envelope, link string) {
 	messageID = messageIDfromURL(controller.Ctx.Input.Param(":messageid"))
 	if messageID == "" {
 		hashID, message, threadRoot, messageID, accessMode, token = readOriginMail(controller)
 		originHashID = hashID
-		controller.Data["link"] = template.URL(hashID)
+		link = string(hashID)
 	} else {
 		var originThreadRoot typeHashID
 		originHashID, _, originThreadRoot, _, accessMode, token = readOriginMail(controller)
@@ -539,7 +539,7 @@ func getMailAndThreadRoot(controller *web.Controller) (accessMode int, token str
 				controller.Abort("403")
 			}
 		}
-		controller.Data["link"] = template.URL(fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(messageID)))
+		link = fmt.Sprintf("%v/%v", originHashID, messageIDtoURL(messageID))
 	}
 	return
 }
@@ -558,7 +558,8 @@ type MainController struct {
 
 // Controller for viewing a particular email.
 func (this *MainController) Get() {
-	accessMode, token, messageID, hashID, threadRoot, originHashID, message := getMailAndThreadRoot(&this.Controller)
+	accessMode, token, messageID, hashID, threadRoot, originHashID, message, link :=
+		getMailAndThreadRoot(&this.Controller)
 	var queryString template.URL
 	if accessMode != accessSingle {
 		var key string
@@ -583,6 +584,7 @@ func (this *MainController) Get() {
 	}
 	this.TplName = "index.tpl"
 	this.Data["rooturl"] = rootURL
+	this.Data["link"] = template.URL(link)
 	this.Data["from"] = message.GetHeader("From")
 	this.Data["subject"] = message.GetHeader("Subject")
 	this.Data["to"] = message.GetHeader("To")
@@ -609,7 +611,7 @@ type AttachmentController struct {
 
 // Controller for downloading mail attachments.
 func (this *AttachmentController) Get() {
-	_, _, _, _, _, _, message := getMailAndThreadRoot(&this.Controller)
+	_, _, _, _, _, _, message, _ := getMailAndThreadRoot(&this.Controller)
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
 	this.Ctx.Output.Header("Content-Disposition",
@@ -686,7 +688,7 @@ func (this *SendController) Get() {
 	if emailAddress == "" {
 		logger.Panicf("email address of %v not found", loginName)
 	}
-	_, _, _, hashID, _, _, _ := getMailAndThreadRoot(&this.Controller)
+	_, _, _, hashID, _, _, _, _ := getMailAndThreadRoot(&this.Controller)
 	mailBody := filterHeaders(hashID)
 	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
 		[]string{emailAddress}, mailBody)
