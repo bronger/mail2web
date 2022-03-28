@@ -629,8 +629,16 @@ type ImageController struct {
 // content type, and – if there is one – a filename.
 func getImage(message *enmime.Envelope, cid string) ([]byte, string, string, error) {
 	for _, part := range message.Inlines {
-		if "cid:"+part.ContentID == cid {
-			return part.Content, part.ContentType, part.FileName, nil
+		if part.ContentID != "" {
+			match := cidRegex.FindStringSubmatch(part.ContentID)
+			if len(match) == 2 {
+				partCid := match[1]
+				if "cid:"+partCid == cid {
+					return part.Content, part.ContentType, part.FileName, nil
+				}
+			} else {
+				logger.Println("Could not match", part.ContentID)
+			}
 		}
 	}
 	return nil, "", "", fmt.Errorf("image %v not found in email", cid)
