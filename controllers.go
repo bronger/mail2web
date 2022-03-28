@@ -621,6 +621,37 @@ func (this *AttachmentController) Get() {
 	check(err)
 }
 
+type ImageController struct {
+	web.Controller
+}
+
+// getImage extracts an inline image from a mail.  It returns the image data,
+// content type, and – if there is one – a filename.
+func getImage(message *enmime.Envelope, cid string) ([]byte, string, string, error) {
+	for _, part := range message.Inlines {
+		if "cid:"+part.ContentID == cid {
+			return part.Content, part.ContentType, part.FileName, nil
+		}
+	}
+	return nil, "", "", fmt.Errorf("image %v not found in email", cid)
+}
+
+// Controller for downloading mail images.
+func (this *ImageController) Get() {
+	_, _, _, _, _, _, message, _ := getMailAndThreadRoot(&this.Controller)
+	cid := this.Ctx.Input.Param(":cid")
+	content, contentType, filename, err := getImage(message, cid)
+	check(err)
+	if filename == "" {
+		this.Ctx.Output.Header("Content-Disposition", "inline")
+	} else {
+		this.Ctx.Output.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%v\"", filename))
+	}
+	this.Ctx.Output.Header("Content-Type", contentType)
+	err = this.Ctx.Output.Body(content)
+	check(err)
+}
+
 // filterHeaders reads the specified mail, removed headers that should not be
 // shared with external due to technical or privacy reasons, and returns the
 // result.  It panics whenever something wents wrong, as it assumes that the
