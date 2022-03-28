@@ -84,6 +84,27 @@ func getBodyNode(root *html.Node) (*html.Node, error) {
 	return nil, errors.New("Missing <body> in the node tree")
 }
 
+// substituteImgSrcs replaces in-place the src attributes of <img> tags, if
+// they start with “cid:”.  In this case, “hashID/img/” is prepended to the URL
+// so that they are valid URL in the browser that can be responded to by the
+// server.
+func substituteImgSrcs(root *html.Node, hashID hashID) {
+	var crawler func(*html.Node)
+	crawler = func(node *html.Node) {
+		if node.Type == html.ElementNode && node.Data == "img" {
+			for i, attribute := range node.Attr {
+				if attribute.Key == "src" && strings.HasPrefix(attribute.Val, "cid:") {
+					node.Attr[i].Val = string(hashID) + "/img/" + attribute.Val
+				}
+			}
+		}
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			crawler(child)
+		}
+	}
+	crawler(root)
+}
+
 // getBody returns everything between <body>…</body> in the given HTML
 // document, or the empty string it it wasn’t found.  It is needed to embed
 // HTML mails in an HTML document.
@@ -91,7 +112,7 @@ func getBodyNode(root *html.Node) (*html.Node, error) {
 // BUG(bronger): We don’t do security sanitisation of the HTML here,
 // e.g. removing all JavaScript, or preventing CSS to leak to the surrounding
 // document.
-func getBody(htmlDocument string) (string, error) {
+func getBody(htmlDocument string, hashID hashID) (string, error) {
 	root, err := html.Parse(strings.NewReader(htmlDocument))
 	if err != nil {
 		return "", err
@@ -100,6 +121,7 @@ func getBody(htmlDocument string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	substituteImgSrcs(bodyNode, hashID)
 	var buffer bytes.Buffer
 	writer := io.Writer(&buffer)
 	for child := bodyNode.FirstChild; child != nil; child = child.NextSibling {
@@ -571,7 +593,7 @@ func (this *MainController) Get() {
 	path := mailPaths[hashID]
 	mailPathsLock.RUnlock()
 	this.Data["name"] = pathToLink(path)
-	body, err := getBody(message.HTML)
+	body, err := getBody(message.HTML, hashID)
 	check(err)
 	this.Data["html"] = template.HTML(body)
 	var attachments []string
