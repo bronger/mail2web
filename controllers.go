@@ -88,13 +88,13 @@ func getBodyNode(root *html.Node) (*html.Node, error) {
 // they start with “cid:”.  In this case, “hashID/img/” is prepended to the URL
 // so that they are valid URL in the browser that can be responded to by the
 // server.
-func substituteImgSrcs(root *html.Node, hashID hashID) {
+func substituteImgSrcs(root *html.Node, urlPrefix string) {
 	var crawler func(*html.Node)
 	crawler = func(node *html.Node) {
 		if node.Type == html.ElementNode && node.Data == "img" {
 			for i, attribute := range node.Attr {
 				if attribute.Key == "src" && strings.HasPrefix(attribute.Val, "cid:") {
-					node.Attr[i].Val = string(hashID) + "/img/" + attribute.Val
+					node.Attr[i].Val = urlPrefix + "/img/" + attribute.Val
 				}
 			}
 		}
@@ -112,7 +112,7 @@ func substituteImgSrcs(root *html.Node, hashID hashID) {
 // BUG(bronger): We don’t do security sanitisation of the HTML here,
 // e.g. removing all JavaScript, or preventing CSS to leak to the surrounding
 // document.
-func getBody(htmlDocument string, hashID hashID) (string, error) {
+func getBody(htmlDocument string, urlPrefix string) (string, error) {
 	root, err := html.Parse(strings.NewReader(htmlDocument))
 	if err != nil {
 		return "", err
@@ -121,7 +121,7 @@ func getBody(htmlDocument string, hashID hashID) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	substituteImgSrcs(bodyNode, hashID)
+	substituteImgSrcs(bodyNode, urlPrefix)
 	var buffer bytes.Buffer
 	writer := io.Writer(&buffer)
 	for child := bodyNode.FirstChild; child != nil; child = child.NextSibling {
@@ -595,7 +595,7 @@ func (this *MainController) Get() {
 	path := mailPaths[hashID]
 	mailPathsLock.RUnlock()
 	this.Data["name"] = pathToLink(path)
-	body, err := getBody(message.HTML, hashID)
+	body, err := getBody(message.HTML, rootURL+"/"+link)
 	check(err)
 	this.Data["html"] = template.HTML(body)
 	var attachments []string
