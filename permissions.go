@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -32,7 +31,7 @@ var permissions struct {
 // written.  FWIW, fsnotify fires four “write” notifications if I save the file
 // with Emacs or Nano.
 func readPermissions() {
-	data, err := ioutil.ReadFile(permissionsPath)
+	data, err := os.ReadFile(permissionsPath)
 	check(err)
 	err = yaml.Unmarshal(data, &permissions)
 	if err != nil {
@@ -107,7 +106,7 @@ func init() {
 	if secretKeyPath == "" {
 		secretKeyPath = "/var/lib/mail2web_secrets/secret_key"
 	}
-	secretKey, err = ioutil.ReadFile(secretKeyPath)
+	secretKey, err = os.ReadFile(secretKeyPath)
 	check(err)
 	secretKey = bytes.Trim(secretKey, "\t\n\r\f\v ")
 	readPermissions()

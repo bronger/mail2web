@@ -9,7 +9,6 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"mime"
 	"net/mail"
 	"net/smtp"
@@ -855,7 +854,7 @@ func (this *HealthController) Get() {
 }
 
 func init() {
-	templateContent, err := ioutil.ReadFile("requestMail.tpl")
+	templateContent, err := os.ReadFile("requestMail.tpl")
 	check(err)
 	requestMailTemplate = textTemplate.Must(textTemplate.New("mail").Parse(string(templateContent)))
 }
