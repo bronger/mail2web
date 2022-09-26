@@ -731,7 +731,7 @@ func (this *SendController) Get() {
 	}
 	_, _, _, hashID, _, _, _, _ := getMailAndThreadRoot(&this.Controller)
 	mailBody := filterHeaders(hashID)
-	err := smtp.SendMail("postfix:587", nil, "bronger@physik.rwth-aachen.de",
+	err := smtp.SendMail(os.Getenv("M2W_SMTP_HOST"), nil, os.Getenv("M2W_SMTP_ENVELOPE_SENDER"),
 		[]string{emailAddress}, mailBody)
 	check(err)
 	this.Data["hash"] = hashID

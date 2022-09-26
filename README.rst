@@ -84,6 +84,15 @@ Environment
   URL prefix for all endpoints.  It defaults to the empty string.  If given, it
   must start with a slash and should not end with a slash.
 
+``M2W_SMTP_HOST``
+  Host and port of the SMTP host for message submission,
+  e.g. ``postfix.local:587``.
+
+``M2W_SMTP_ENVELOPE_SENDER``
+  Content of the sender field in the *envelope* of the mail.  Note that the
+  ``From:`` field of mails sent by mail2web always have the original ``From:``
+  field content, and that you MTA must be okay with that (most aren’t).
+
 
 Mail archive structure
 ======================
