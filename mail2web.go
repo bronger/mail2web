@@ -142,9 +142,9 @@ func processMail(path string) (update update) {
 	update.MessageID = messageID(match[1])
 	update.HashID = messageIDToHashID(update.MessageID)
 	update.Timestamp, _ = mail.ParseDate(message.Header.Get("Date"))
-	raw_references := message.Header.Get("References")
-	if raw_references != "" {
-		update.references = parseBackreferences(raw_references)
+	rawReferences := message.Header.Get("References")
+	if rawReferences != "" {
+		update.references = parseBackreferences(rawReferences)
 	}
 	update.rawFrom = message.Header.Get("From")
 	update.rawTo = message.Header.Get("To")
