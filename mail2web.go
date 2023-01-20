@@ -164,7 +164,7 @@ func setupLogging() *log.Logger {
 		return log.Default()
 	}
 	logFilename := filepath.Join(logPath, "mail2web.log")
-	logfile, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logfile, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o666)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -344,7 +344,8 @@ func setUpWatcher() {
 							mailPathsLock.Unlock()
 							updates <- update{
 								delete:   true,
-								mailInfo: mailInfo{HashID: hashID}}
+								mailInfo: mailInfo{HashID: hashID},
+							}
 						}
 						mailsByAddressLock.Lock()
 						for _, mails := range mailsByAddress {
