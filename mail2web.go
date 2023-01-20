@@ -16,6 +16,7 @@ import (
 
 	"github.com/beego/beego/v2/server/web"
 	"github.com/fsnotify/fsnotify"
+	"golang.org/x/exp/maps"
 )
 
 type (
@@ -145,6 +146,14 @@ func processMail(path string) (update update) {
 	rawReferences := message.Header.Get("References")
 	if rawReferences != "" {
 		update.references = parseBackreferences(rawReferences)
+	}
+	rawInReplyTo := message.Header.Get("In-Reply-To")
+	if rawInReplyTo != "" {
+		if update.references == nil {
+			update.references = parseBackreferences(rawInReplyTo)
+		} else {
+			maps.Copy(update.references, parseBackreferences(rawInReplyTo))
+		}
 	}
 	update.rawFrom = message.Header.Get("From")
 	update.rawTo = message.Header.Get("To")
