@@ -23,7 +23,7 @@ def hash_id(message_id, salt=""):
     return base64.urlsafe_b64encode(hash_.digest())[:10].decode()
 
 
-message_id = email.parser.Parser().parse(open(sys.argv[1]))["Message-ID"].strip().strip("<>")
+message_id = email.parser.Parser().parse(open(sys.argv[1], errors="ignore"))["Message-ID"].strip().strip("<>")
 if not args.access:
     url = url_root + hash_id(message_id)
 else:
