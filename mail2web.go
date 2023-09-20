@@ -16,6 +16,7 @@ import (
 
 	"github.com/beego/beego/v2/server/web"
 	"github.com/fsnotify/fsnotify"
+	"go4.org/must"
 	"golang.org/x/exp/maps"
 )
 
@@ -126,10 +127,7 @@ func processMail(path string) (update update) {
 	}
 	file, err := os.Open(path)
 	check(err)
-	defer func() {
-		err := file.Close()
-		check(err)
-	}()
+	defer must.Close(file)
 	message, err := mail.ReadMessage(file)
 	if err != nil {
 		logger.Println(err)

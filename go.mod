@@ -6,9 +6,10 @@ require (
 	github.com/beego/beego/v2 v2.0.1
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/jhillyerd/enmime v0.8.4
+	go4.org v0.0.0-20230225012048-214862532bf5
 	golang.org/x/exp v0.0.0-20230118134722-a68e582fa157
-	golang.org/x/net v0.1.0
-	golang.org/x/text v0.4.0
+	golang.org/x/net v0.7.0
+	golang.org/x/text v0.7.0
 	gopkg.in/yaml.v2 v2.2.8
 )
 
@@ -33,7 +34,7 @@ require (
 	github.com/ssor/bom v0.0.0-20170718123548-6386211fdfcf // indirect
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/mod v0.6.0 // indirect
-	golang.org/x/sys v0.1.0 // indirect
+	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/tools v0.2.0 // indirect
 	google.golang.org/protobuf v1.23.0 // indirect
 )

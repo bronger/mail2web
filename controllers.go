@@ -23,6 +23,7 @@ import (
 
 	"github.com/beego/beego/v2/server/web"
 	"github.com/jhillyerd/enmime"
+	"go4.org/must"
 	"golang.org/x/net/html"
 	"golang.org/x/text/encoding/charmap"
 )
@@ -318,10 +319,7 @@ func threadNodeByHashID(hashID hashID) *threadNode {
 	}
 	file, err := os.Open(path)
 	check(err)
-	defer func() {
-		err := file.Close()
-		check(err)
-	}()
+	defer must.Close(file)
 	message, err := mail.ReadMessage(file)
 	var from, subject string
 	if err == nil {
@@ -438,10 +436,7 @@ func readMail(mailPath string) (message *enmime.Envelope, err error) {
 		return
 	}
 	check(err)
-	defer func() {
-		err := file.Close()
-		check(err)
-	}()
+	defer must.Close(file)
 	message, err = enmime.ReadEnvelope(file)
 	check(err)
 	return
@@ -671,10 +666,7 @@ func filterHeaders(hashID hashID) []byte {
 	file, err := os.Open(mailPaths[hashID])
 	mailPathsLock.RUnlock()
 	check(err)
-	defer func() {
-		err := file.Close()
-		check(err)
-	}()
+	defer must.Close(file)
 	scanner := bufio.NewScanner(file)
 	var lines [][]byte
 	const (
@@ -794,10 +786,7 @@ func (this *MailRequestController) Get() {
 	}
 	file, err := os.Open(mailPath)
 	check(err)
-	defer func() {
-		err := file.Close()
-		check(err)
-	}()
+	defer must.Close(file)
 	message, err := mail.ReadMessage(file)
 	if err != nil {
 		logger.Println(err)
