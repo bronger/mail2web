@@ -826,7 +826,7 @@ func (this *MailRequestController) Get() {
 		Subject("Request for hash ID for mail "+loginName).
 		ReplyTo("", emailAddress).
 		Text(mailContent.Bytes()).
-		To("", adminMail).Send("postfix:587", nil)
+		To("", adminMail).Send(enmime.NewSMTP("postfix:587", nil))
 	check(err)
 	this.TplName = "mailRequest.tpl"
 	this.Data["messageid"] = messageID
