@@ -428,9 +428,14 @@ func finalizeThread(messageID messageID, originHashID hashID, thread *threadNode
 	return thread
 }
 
+var envelopeCache sync.Map
+
 // readMail reads an RFC 5322 file and returns it as a mail object.  The
 // returned error is non-nil only if the mail file could not be found.
 func readMail(mailPath string) (message *enmime.Envelope, err error) {
+	if value, ok := envelopeCache.Load(mailPath); ok {
+		return value.(*enmime.Envelope), nil
+	}
 	file, err := os.Open(mailPath)
 	if errors.Is(err, fs.ErrNotExist) {
 		return
@@ -439,6 +444,7 @@ func readMail(mailPath string) (message *enmime.Envelope, err error) {
 	defer must.Close(file)
 	message, err = enmime.ReadEnvelope(file)
 	check(err)
+	envelopeCache.Store(mailPath, message)
 	return
 }
 
