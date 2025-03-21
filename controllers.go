@@ -614,6 +614,9 @@ func (this *AttachmentController) Get() {
 	_, _, _, _, _, _, message, _ := getMailAndThreadRoot(&this.Controller)
 	index, err := strconv.Atoi(this.Ctx.Input.Param(":index"))
 	check(err)
+	if index >= len(message.Attachments) {
+		this.Abort("404")
+	}
 	this.Ctx.Output.Header("Content-Disposition",
 		fmt.Sprintf("attachment; filename=\"%v\"", message.Attachments[index].FileName))
 	this.Ctx.Output.Header("Content-Type", message.Attachments[index].ContentType)
