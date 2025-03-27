@@ -547,8 +547,8 @@ func getMailAndThreadRoot(controller *web.Controller) (accessMode int, token str
 // pathToLink generates a nice title for the mail Web page.  It extracts the
 // “folder/id” from the given full mail path.
 func pathToLink(path string) string {
-	prefix, id := filepath.Split(path)
-	_, folder := filepath.Split(strings.TrimSuffix(prefix, "/"))
+	folder, id := filepath.Split(strings.TrimPrefix(strings.TrimPrefix(path, mailDir), "/"))
+	folder = strings.Replace(strings.TrimSuffix(folder, "/"), "/", ".", -1)
 	return folder + "/" + id
 }
 
